@@ -20,7 +20,7 @@ import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { FONT_OPTIONS } from "@/lib/constants";
+import { FONT_OPTIONS, BANNER_PRESETS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 
 interface BannerActionsProps {
@@ -53,9 +53,9 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     setIsDownloading(true);
 
     const { scale } = DOWNLOAD_SIZES[size];
-    const { width = 1280, height = 720 } = banner.customDimensions || banner.preset && BANNER_PRESETS[banner.preset] || {};
+    const { width = 851, height = 315 } = banner.customDimensions || (banner.preset && BANNER_PRESETS[banner.preset as keyof typeof BANNER_PRESETS]) || {};
 
-    const fileName = `${banner.text || 'banner'}.${format}`;
+    const fileName = `${banner.text?.substring(0, 20) || 'banner'}.${format}`;
 
     try {
       const options = {
@@ -68,22 +68,21 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
           height: `${height}px`,
         },
         pixelRatio: 1,
-        fetchRequestInit: { 
-          headers: new Headers(), 
-          mode: 'cors' as RequestMode, 
-          cache: 'no-cache' as RequestCache,
-        }
+        fetchRequestInit: {
+          mode: 'cors' as RequestMode,
+          credentials: 'omit' as RequestCredentials,
+        },
       };
 
       let dataUrl;
       const element = previewRef.current;
       
       if (format === 'png') {
-        dataUrl = await htmlToImage.toPng(element, { ...options, quality: 1 });
+        dataUrl = await htmlToImage.toPng(element, options);
       } else if (format === 'jpg') {
         dataUrl = await htmlToImage.toJpeg(element, { ...options, quality: 0.95 });
       } else if (format === 'pdf') {
-        const pngDataUrl = await htmlToImage.toPng(element, { ...options, quality: 1 });
+        const pngDataUrl = await htmlToImage.toPng(element, options);
         const doc = new jsPDF({
           orientation: width > height ? 'landscape' : 'portrait',
           unit: 'px',
@@ -92,6 +91,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         doc.addImage(pngDataUrl, 'PNG', 0, 0, width, height);
         doc.save(fileName);
         setIsDownloading(false);
+        toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.`});
         return;
       }
 
@@ -100,6 +100,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         link.download = fileName;
         link.href = dataUrl;
         link.click();
+        toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.`});
       } else {
         throw new Error('No se pudo generar la URL de datos.');
       }
@@ -108,7 +109,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
       toast({
         variant: 'destructive',
         title: 'Error de Descarga',
-        description: 'Ocurrió un error al generar tu archivo.',
+        description: 'Ocurrió un error al generar tu archivo. Revisa la consola para más detalles.',
       });
     } finally {
       setIsDownloading(false);
@@ -126,9 +127,6 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
       textShadow: textEffects?.shadow.enabled
         ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
         : 'none',
-      WebkitTextStroke: textEffects?.stroke.enabled
-        ? `${textEffects.stroke.width}px ${textEffects.stroke.color}`
-        : 'unset',
   };
 
   return (
@@ -139,8 +137,8 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
               ref={previewRef}
               className="relative overflow-hidden bg-muted/50"
               style={{
-                width: `${bannerDimensions.width}px`,
-                height: `${bannerDimensions.height}px`,
+                width: `${bannerDimensions?.width}px`,
+                height: `${bannerDimensions?.height}px`,
               }}
             >
               {banner.bannerImage && (
@@ -173,8 +171,8 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
                   }}
                 >
                   <p
-                    className={cn(headlineFont, 'font-bold whitespace-nowrap')}
-                    style={{ ...textPreviewStyles, lineHeight: 1.2 } as React.CSSProperties}
+                    className={cn(headlineFont, 'font-bold whitespace-nowrap', {'text-stroke': textEffects?.stroke.enabled})}
+                    style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects?.stroke.color, '--tw-stroke-width': `${textEffects?.stroke.width}px`, lineHeight: 1.2 } as React.CSSProperties}
                   >
                     {banner.text}
                   </p>
@@ -196,14 +194,14 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuItem onClick={handleEdit}>
-            <Edit className="mr-2" />
-            Editar
+            <Edit className="mr-2 h-4 w-4" />
+            <span>Editar</span>
           </DropdownMenuItem>
           
           <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={isDownloading}>
-                {isDownloading ? <Loader2 className="mr-2 animate-spin" /> : <Download className="mr-2" />}
-                Descargar
+                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                <span>Descargar</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => performDownload('png', 'medium')}>PNG</DropdownMenuItem>
@@ -222,20 +220,11 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
           
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => onDelete(banner.id)}>
-            <Trash2 className="mr-2" />
-            Eliminar
+            <Trash2 className="mr-2 h-4 w-4" />
+            <span>Eliminar</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
   );
 }
-
-const BANNER_PRESETS: { [key: string]: { name: string; width: number; height: number; } } = {
-  facebookCover: { name: 'Facebook Cover', width: 851, height: 315 },
-  instagramPost: { name: 'Instagram Post', width: 1080, height: 1080 },
-  instagramStory: { name: 'Instagram Story', width: 1080, height: 1920 },
-  twitterHeader: { name: 'Twitter Header', width: 1500, height: 500 },
-  linkedinBanner: { name: 'LinkedIn Banner', width: 1584, height: 396 },
-  youtubeChannel: { name: 'YouTube Channel Art', width: 2560, height: 1440 },
-};
