@@ -220,20 +220,20 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
-                 {(['png', 'jpg', 'pdf'] as const).map((format) => (
-                  <DropdownMenuSub key={format}>
-                    <DropdownMenuSubTrigger>{format.toUpperCase()}</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
-                          <DropdownMenuItem key={sizeKey} onClick={() => performDownload(format, sizeKey)}>
-                            {DOWNLOAD_SIZES[sizeKey].name} ({format.toUpperCase()})
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
-                ))}
+                {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                    <DropdownMenuSub key={sizeKey}>
+                      <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {(['png', 'jpg', 'pdf'] as const).map((format) => (
+                            <DropdownMenuItem key={format} onClick={() => performDownload(format, sizeKey)}>
+                              {format.toUpperCase()}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  ))}
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
@@ -248,5 +248,3 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     </>
   );
 }
-
-    

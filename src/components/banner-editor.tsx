@@ -439,21 +439,21 @@ export function BannerEditor() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuPortal>
-              <DropdownMenuContent align="center" className="w-56">
-                {(['png', 'jpg', 'pdf'] as const).map((format) => (
-                  <DropdownMenuSub key={format}>
-                    <DropdownMenuSubTrigger>{format.toUpperCase()}</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
-                          <DropdownMenuItem key={sizeKey} onClick={() => performDownload(format, sizeKey)}>
-                            {DOWNLOAD_SIZES[sizeKey].name} ({format.toUpperCase()})
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
-                ))}
+               <DropdownMenuContent align="center" className="w-56">
+                  {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                    <DropdownMenuSub key={sizeKey}>
+                      <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {(['png', 'jpg', 'pdf'] as const).map((format) => (
+                            <DropdownMenuItem key={format} onClick={() => performDownload(format, sizeKey)}>
+                              {format.toUpperCase()}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenuPortal>
           </DropdownMenu>
@@ -546,5 +546,3 @@ export function BannerEditor() {
     </div>
   );
 }
-
-    
