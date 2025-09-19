@@ -28,12 +28,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuPortal,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
-  DropdownMenuPortal
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 const DOWNLOAD_SIZES = {
@@ -157,86 +156,145 @@ export function BannerEditor() {
     }
   };
 
-    const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
-    const element = bannerPreviewRef.current;
-    if (!element) {
-      toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
-      return;
+  const embedGoogleFont = async (cssRule: string): Promise<string> => {
+    const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
+    if (!urlMatch) return cssRule;
+  
+    const fontUrl = urlMatch[1];
+    try {
+      const res = await fetch(fontUrl);
+      const fontBuffer = await res.arrayBuffer();
+      const fontBase64 = btoa(
+        new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+  
+      return cssRule.replace(urlMatch[1], `data:font/woff2;base64,${fontBase64}`);
+    } catch (e) {
+      console.warn('No se pudo embeder la fuente', fontUrl, e);
+      return cssRule;
+    }
+  };
+
+  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
+    if (!bannerPreviewRef.current) {
+        toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
+        return;
     }
     setIsDownloading(true);
 
-    const { scale } = DOWNLOAD_SIZES[sizeKey];
+    const { scale: sizeScale } = DOWNLOAD_SIZES[sizeKey];
     const { width, height } = bannerDimensions;
     const fileName = `${text.substring(0, 20) || 'banner'}-${sizeKey}.${format}`;
 
     try {
-        const fontFamilies = FONT_OPTIONS.map(f => f.value);
-        const fontCSS = await htmlToImage.getFontEmbedCSS(document.body, {
-            fontFamilies,
+        const styleSheets = Array.from(document.styleSheets);
+        let cssText = '';
+
+        for (const sheet of styleSheets) {
+            try {
+                const rules = sheet.cssRules;
+                if (rules) {
+                    for (const rule of Array.from(rules)) {
+                        if (rule.cssText.startsWith('@font-face')) {
+                            cssText += await embedGoogleFont(rule.cssText);
+                        } else {
+                            cssText += rule.cssText;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('No se pudo acceder a la hoja de estilos, omitiendo: ', e);
+                continue;
+            }
+        }
+        
+        const styleEl = document.createElement('style');
+        styleEl.innerHTML = cssText;
+        
+        const dataUrlOptions: htmlToImage.Options = {
+            width,
+            height,
+            style: {
+              transform: `scale(${sizeScale})`,
+              transformOrigin: 'top left',
+              width: `${width}px`,
+              height: `${height}px`
+            },
+            pixelRatio: 1, // We are handling scaling manually
             fetchRequestInit: {
                 mode: 'cors',
                 credentials: 'omit',
-            }
-        });
-
-        const options = {
-            width,
-            height,
-            canvasWidth: width * scale,
-            canvasHeight: height * scale,
-            style: {
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
             },
-            pixelRatio: 1,
-            fetchRequestInit: {
-              mode: 'cors' as RequestMode,
-              credentials: 'omit' as RequestCredentials,
-            },
-            fontEmbedCSS: fontCSS,
+            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', // Transparent 1x1 pixel
             filter: (node: HTMLElement) => {
-              return !(node.tagName === 'IMG' && (node as HTMLImageElement).crossOrigin === 'anonymous');
+                if (node.tagName === 'IMG' && node.hasAttribute('src')) {
+                    // Prevent html-to-image from re-fetching images, we will handle them
+                    return true;
+                }
+                return true;
+            },
+        };
+
+        const generateAndDownload = async (generator: (node: HTMLElement, options?: any) => Promise<string>, options: any, ext: 'png' | 'jpeg') => {
+            const tempNode = bannerPreviewRef.current!.cloneNode(true) as HTMLElement;
+            tempNode.prepend(styleEl);
+
+            // Handle images manually
+            const images = Array.from(tempNode.getElementsByTagName('img'));
+            for(const img of images){
+                if(img.src.startsWith('http')) { // Only handle external images
+                    try {
+                        const response = await fetch(img.src, { mode: 'cors' });
+                        const blob = await response.blob();
+                        const dataUrl = await new Promise<string>(resolve => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.readAsDataURL(blob);
+                        });
+                        img.src = dataUrl;
+                    } catch (e) {
+                        console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
+                    }
+                }
+            }
+            
+            const dataUrl = await generator(tempNode, options);
+            if (ext === 'jpeg' && format === 'pdf') {
+                const doc = new jsPDF({
+                    orientation: width > height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [width * sizeScale, height * sizeScale],
+                });
+                doc.addImage(dataUrl, 'JPEG', 0, 0, width * sizeScale, height * sizeScale);
+                doc.save(fileName);
+            } else {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = dataUrl;
+                link.click();
             }
         };
 
-        let dataUrl;
-        
         if (format === 'png') {
-          dataUrl = await htmlToImage.toPng(element, options);
+            await generateAndDownload(htmlToImage.toPng, dataUrlOptions, 'png');
         } else if (format === 'jpg') {
-          dataUrl = await htmlToImage.toJpeg(element, { ...options, quality: 0.95 });
+            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
         } else if (format === 'pdf') {
-          const pngDataUrl = await htmlToImage.toPng(element, options);
-          const doc = new jsPDF({
-            orientation: width > height ? 'landscape' : 'portrait',
-            unit: 'px',
-            format: [width * scale, height * scale],
-          });
-          doc.addImage(pngDataUrl, 'PNG', 0, 0, width * scale, height * scale);
-          doc.save(fileName);
-          setIsDownloading(false);
-          toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
-          return;
+            // PDF generation will use JPEG for better compression
+            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
         }
 
-        if (dataUrl) {
-          const link = document.createElement('a');
-          link.download = fileName;
-          link.href = dataUrl;
-          link.click();
-          toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
-        } else {
-          throw new Error('No se pudo generar la URL de datos.');
-        }
+        toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
+
     } catch (error) {
-      console.error('Error en la descarga:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error de Descarga',
-        description: 'Ocurrió un error al generar tu archivo. Las imágenes de otras webs pueden causar este problema.',
-      });
+        console.error('Error en la descarga:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error de Descarga',
+            description: 'Ocurrió un error al generar tu archivo. Revisa la consola para más detalles.',
+        });
     } finally {
-      setIsDownloading(false);
+        setIsDownloading(false);
     }
   }, [bannerDimensions, text, toast]);
   
@@ -546,3 +604,5 @@ export function BannerEditor() {
     </div>
   );
 }
+
+    
