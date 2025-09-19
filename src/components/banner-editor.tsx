@@ -239,11 +239,9 @@ export function BannerEditor() {
             </CardHeader>
             <CardContent className="flex items-center justify-center p-2 sm:p-6">
               <div
-                className="relative overflow-hidden bg-muted/50 rounded-lg shadow-inner"
+                className="relative w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner"
                 style={{
-                  width: `${bannerDimensions.width}px`,
-                  height: `${bannerDimensions.height}px`,
-                  maxWidth: '100%',
+                  aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
                 }}
               >
                 {bannerImage ? (
