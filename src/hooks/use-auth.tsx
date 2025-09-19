@@ -14,7 +14,7 @@ import {
   User,
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         // User is signed in, see if they exist in Firestore
         const userDocRef = doc(db, 'users', user.uid);
@@ -47,8 +48,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               email: user.email,
               displayName: user.displayName || '',
               photoURL: user.photoURL || '',
-              createdAt: new Date(),
-              lastLogin: new Date(),
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
             });
           } catch (error) {
             console.error("Error creating user document in Firestore:", error);
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           // If user exists, just update last login time.
           try {
-            await setDoc(userDocRef, { lastLogin: new Date() }, { merge: true });
+            await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
           } catch (error) {
             console.error("Error updating last login in Firestore:", error);
           }
