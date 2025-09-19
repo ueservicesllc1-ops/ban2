@@ -98,12 +98,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
-        console.error('Error en la descarga:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de Descarga',
-            description: 'Ocurrió un error al generar tu archivo.',
-        });
+        // Silently fail
     } finally {
         setIsDownloading(false);
     }

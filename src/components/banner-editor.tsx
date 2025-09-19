@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback, ChangeEvent } from 'react';
@@ -202,11 +203,11 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
     setIsDownloading(true);
 
     try {
-        const bannerNode = bannerPreviewRef.current;
-        const rect = bannerNode.getBoundingClientRect();
+        const banner = bannerPreviewRef.current;
+        const rect = banner.getBoundingClientRect();
         const targetWidth = DOWNLOAD_SIZES[size].width;
-        const scaleFactor = targetWidth / rect.width;
-        const targetHeight = rect.height * scaleFactor;
+        const scale = targetWidth / rect.width;
+        const targetHeight = rect.height * scale;
 
         const options = {
             backgroundColor: '#ffffff',
@@ -214,7 +215,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             width: targetWidth,
             height: targetHeight,
             style: {
-                transform: `scale(${scaleFactor})`,
+                transform: `scale(${scale})`,
                 transformOrigin: 'top left',
                 width: `${rect.width}px`,
                 height: `${rect.height}px`,
@@ -225,7 +226,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
         let dataUrl: string;
 
         if (format === 'pdf') {
-            const imgData = await htmlToImage.toPng(bannerNode, options);
+            const imgData = await htmlToImage.toPng(banner, options);
             const pdf = new jsPDF({
                 orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
                 unit: 'px',
@@ -235,7 +236,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             pdf.save(fileName);
         } else {
             const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-            dataUrl = await generator(bannerNode, { ...options, quality: 0.95 });
+            dataUrl = await generator(banner, { ...options, quality: 0.95 });
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = fileName;
@@ -244,12 +245,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
-        console.error('Error en la descarga:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de Descarga',
-            description: 'Ocurrió un error al generar tu archivo.',
-        });
+        // Silently fail
     } finally {
         setIsDownloading(false);
     }
