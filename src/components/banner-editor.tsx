@@ -221,7 +221,7 @@ export function BannerEditor() {
     if (result.success) {
       setAiSuggestions(result.data);
       const suggestedLogoPlacement = result.data.logoPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
-      const suggestedTextPlacement = result.data.textPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
+      const suggestedTextPlacement = result.data.textPlacement.toLowerCase().replace(/ /g, '-_').replace(/_/g, '-');
       
       setLogoPosition(placementToPercentage(suggestedLogoPlacement));
       setTextPosition(placementToPercentage(suggestedTextPlacement));
@@ -357,10 +357,7 @@ export function BannerEditor() {
           // The library fails to capture images from Firebase storage unless we provide this.
           // It's a known issue with CORS and external images.
           filter: (node: HTMLElement) => {
-            if (node.tagName === 'IMG' && (node as HTMLImageElement).crossOrigin === 'anonymous') {
-                return false; // Exclude these images and let the library handle them
-            }
-            return true;
+            return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
           }
       };
       let dataUrl;
