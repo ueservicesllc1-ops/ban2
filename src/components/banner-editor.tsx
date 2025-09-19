@@ -340,15 +340,6 @@ export function BannerEditor() {
     const format = downloadOptions.format;
 
     try {
-      const fontFamilies = FONT_OPTIONS.map(f => f.value);
-      const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
-          fontFamilies,
-          fetchRequestInit: {
-              mode: 'cors',
-              credentials: 'omit',
-          }
-      });
-
       const options = {
           width: width,
           height: height,
@@ -363,11 +354,13 @@ export function BannerEditor() {
             mode: 'cors' as RequestMode,
             credentials: 'omit' as RequestCredentials,
           },
-          fontEmbedCSS: fontCSS,
           // The library fails to capture images from Firebase storage unless we provide this.
           // It's a known issue with CORS and external images.
           filter: (node: HTMLElement) => {
-            return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
+            if (node.tagName === 'IMG' && (node as HTMLImageElement).crossOrigin === 'anonymous') {
+                return false; // Exclude these images and let the library handle them
+            }
+            return true;
           }
       };
       let dataUrl;
