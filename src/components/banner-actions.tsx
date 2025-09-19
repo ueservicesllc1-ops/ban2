@@ -30,10 +30,11 @@ interface BannerActionsProps {
   onDelete: (bannerId: string) => void;
 }
 
-const DOWNLOAD_SIZES = {
-  small: { name: 'Pequeño', scale: 0.5 },
-  medium: { name: 'Mediano', scale: 1 },
-  large: { name: 'Grande', scale: 2 },
+type DownloadSize = 'small' | 'medium' | 'large';
+const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
+  small: { name: 'Pequeño', width: 600 },
+  medium: { name: 'Mediano', width: 1080 },
+  large: { name: 'Grande', width: 1920 },
 };
 
 export function BannerActions({ banner, children, onDelete }: BannerActionsProps) {
@@ -46,47 +47,66 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     router.push(`/?edit=${banner.id}`);
   };
 
-  const embedGoogleFont = async (cssRule: string): Promise<string> => {
-    const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
-    if (!urlMatch) return cssRule;
-  
-    const fontUrl = urlMatch[1];
-    try {
-      const res = await fetch(fontUrl);
-      const fontBuffer = await res.arrayBuffer();
-      const fontBase64 = btoa(
-        new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-  
-      return cssRule.replace(urlMatch[1], `data:font/woff2;base64,${fontBase64}`);
-    } catch (e) {
-      console.warn('No se pudo embeder la fuente', fontUrl, e);
-      return cssRule;
-    }
-  };
-
-  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
+  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize = 'medium') => {
     if (!previewRef.current) {
         toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
         return;
     }
     setIsDownloading(true);
 
-    const { scale: sizeScale } = DOWNLOAD_SIZES[sizeKey];
+    const bannerNode = previewRef.current;
     const bannerDimensions = (banner.preset === 'custom' ? banner.customDimensions : (banner.preset && BANNER_PRESETS[banner.preset as keyof typeof BANNER_PRESETS])) || { width: 851, height: 315 };
-    const { width = 851, height = 315 } = bannerDimensions;
-    
-    const fileName = `${banner.text?.substring(0, 20) || 'banner'}-${sizeKey}.${format}`;
+    const fileName = `${banner.text?.substring(0, 20) || 'banner'}-${size}.${format}`;
 
     try {
+        const tempNode = bannerNode.cloneNode(true) as HTMLElement;
+        // The clone needs to be in the DOM to be processed by html-to-image
+        tempNode.style.position = 'fixed';
+        tempNode.style.left = '-9999px';
+        tempNode.style.top = '0px';
+        document.body.appendChild(tempNode);
+
+        // Preload and embed images
+        const images = Array.from(tempNode.getElementsByTagName('img'));
+        for (const img of images) {
+            if (img.src.startsWith('http')) {
+                 try {
+                    const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
+                    const blob = await response.blob();
+                    const dataUrl = await new Promise<string>(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                    });
+                    img.src = dataUrl;
+                } catch (e) {
+                    console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
+                }
+            }
+        }
+        
+        // Embed fonts
         const styleSheets = Array.from(document.styleSheets);
         let cssText = '';
+        const embedGoogleFont = async (cssRule: string): Promise<string> => {
+            const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
+            if (!urlMatch) return cssRule;
+            const fontUrl = urlMatch[1];
+            try {
+                const res = await fetch(fontUrl);
+                const fontBuffer = await res.arrayBuffer();
+                const fontBase64 = btoa(new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+                return cssRule.replace(fontUrl, `data:font/woff2;base64,${fontBase64}`);
+            } catch (e) {
+                console.warn('No se pudo embeder la fuente', fontUrl, e);
+                return cssRule;
+            }
+        };
 
         for (const sheet of styleSheets) {
             try {
-                const rules = sheet.cssRules;
-                if (rules) {
-                    for (const rule of Array.from(rules)) {
+                if (sheet.cssRules) {
+                    for (const rule of Array.from(sheet.cssRules)) {
                         if (rule.cssText.startsWith('@font-face')) {
                             cssText += await embedGoogleFont(rule.cssText);
                         } else {
@@ -96,77 +116,45 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
                 }
             } catch (e) {
                 console.warn('No se pudo acceder a la hoja de estilos, omitiendo: ', e);
-                continue;
             }
         }
-        
         const styleEl = document.createElement('style');
         styleEl.innerHTML = cssText;
-        
-        const dataUrlOptions: htmlToImage.Options = {
-            width,
-            height,
+        tempNode.prepend(styleEl);
+
+        const targetWidth = DOWNLOAD_SIZES[size].width;
+        const scaleFactor = targetWidth / bannerDimensions.width;
+        const targetHeight = bannerDimensions.height * scaleFactor;
+
+        const options = {
+            width: bannerDimensions.width,
+            height: bannerDimensions.height,
             style: {
-              transform: `scale(${sizeScale})`,
-              transformOrigin: 'top left',
-              width: `${width}px`,
-              height: `${height}px`
+                transform: `scale(${scaleFactor})`,
+                transformOrigin: 'top left',
             },
-            pixelRatio: 1,
-            fetchRequestInit: {
-                mode: 'cors',
-                credentials: 'omit',
-            },
-            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            pixelRatio: 2, // for high quality
         };
 
-        const generateAndDownload = async (generator: (node: HTMLElement, options?: any) => Promise<string>, options: any, ext: 'png' | 'jpeg') => {
-            const tempNode = previewRef.current!.cloneNode(true) as HTMLElement;
-            tempNode.prepend(styleEl);
-
-            const images = Array.from(tempNode.getElementsByTagName('img'));
-            for(const img of images){
-                if(img.src.startsWith('http')) {
-                    try {
-                        const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
-                        const blob = await response.blob();
-                        const dataUrl = await new Promise<string>(resolve => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result as string);
-                            reader.readAsDataURL(blob);
-                        });
-                        img.src = dataUrl;
-                    } catch (e) {
-                        console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
-                    }
-                }
-            }
-            
+        if (format === 'pdf') {
+            const jpegData = await htmlToImage.toJpeg(tempNode, { ...options, quality: 0.95 });
+            const doc = new jsPDF({
+                orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [targetWidth, targetHeight],
+            });
+            doc.addImage(jpegData, 'JPEG', 0, 0, targetWidth, targetHeight);
+            doc.save(fileName);
+        } else {
+            const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
             const dataUrl = await generator(tempNode, options);
-            if (ext === 'jpeg' && format === 'pdf') {
-                const doc = new jsPDF({
-                    orientation: width > height ? 'landscape' : 'portrait',
-                    unit: 'px',
-                    format: [width * sizeScale, height * sizeScale],
-                });
-                doc.addImage(dataUrl, 'JPEG', 0, 0, width * sizeScale, height * sizeScale);
-                doc.save(fileName);
-            } else {
-                const link = document.createElement('a');
-                link.download = fileName;
-                link.href = dataUrl;
-                link.click();
-            }
-        };
-
-        if (format === 'png') {
-            await generateAndDownload(htmlToImage.toPng, dataUrlOptions, 'png');
-        } else if (format === 'jpg') {
-            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
-        } else if (format === 'pdf') {
-            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
         }
-
+        
+        document.body.removeChild(tempNode);
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
 
     } catch (error) {
@@ -271,7 +259,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
-                {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                {(Object.keys(DOWNLOAD_SIZES) as DownloadSize[]).map((sizeKey) => (
                     <DropdownMenuSub key={sizeKey}>
                       <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
@@ -299,7 +287,3 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     </>
   );
 }
-
-    
-
-    

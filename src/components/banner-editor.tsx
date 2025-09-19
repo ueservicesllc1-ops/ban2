@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, Download, Move } from 'lucide-react';
+import { Loader2, Save, Download, Move, Sparkles } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -34,11 +34,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getPlacementSuggestions } from '@/app/actions';
+import { fileToDataUri } from '@/lib/utils';
 
-const DOWNLOAD_SIZES = {
-  small: { name: 'Pequeño', scale: 0.5 },
-  medium: { name: 'Mediano', scale: 1 },
-  large: { name: 'Grande', scale: 2 },
+type DownloadSize = 'small' | 'medium' | 'large';
+const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
+  small: { name: 'Pequeño', width: 600 },
+  medium: { name: 'Mediano', width: 1080 },
+  large: { name: 'Grande', width: 1920 },
 };
 
 export function BannerEditor() {
@@ -69,6 +72,7 @@ export function BannerEditor() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   
   const [isDraggingLogo, setIsDraggingLogo] = useState(false);
   const [isDraggingText, setIsDraggingText] = useState(false);
@@ -77,16 +81,51 @@ export function BannerEditor() {
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
   const bannerWrapperRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  
+
   const bannerDimensions = useMemo(() => {
     if (preset === 'custom') return customDimensions;
     return BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS] || BANNER_PRESETS.facebookCover;
   }, [preset, customDimensions]);
 
+   useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && user) {
+      const fetchBannerData = async () => {
+        try {
+          const docRef = doc(db, 'users', user.uid, 'banners', editId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setBannerId(editId);
+            setBannerImage(data.bannerImage || null);
+            setLogoImage(data.logoImage || null);
+            setText(data.text || 'Tu Texto Aquí');
+            setPreset(data.preset || 'facebookCover');
+            if (data.preset === 'custom' && data.customDimensions) {
+              setCustomDimensions(data.customDimensions);
+            }
+            setLogoPosition(data.logoPosition || { x: 15, y: 15 });
+            setLogoSize(data.logoSize || 15);
+            setTextPosition(data.textPosition || { x: 50, y: 50 });
+            setTextStyle(data.textStyle || { font: 'Poppins', size: 48, color: '#FFFFFF' });
+            setTextEffects(data.textEffects || { shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 }, stroke: { enabled: false, color: '#000000', width: 1 } });
+          } else {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se encontró el banner para editar.'});
+            router.replace('/');
+          }
+        } catch (error) {
+          console.error("Error fetching banner:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el banner.'});
+        }
+      };
+      fetchBannerData();
+    }
+   }, [searchParams, user, router, toast]);
+
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; // p-4 = 1rem * 2 = 32px
+      const padding = 32;
       const availableWidth = container.clientWidth - padding;
       const availableHeight = container.clientHeight - padding;
       
@@ -97,7 +136,6 @@ export function BannerEditor() {
       setScale(newScale);
     }
   }, [bannerDimensions]);
-
 
   useEffect(() => {
     updateScale();
@@ -155,46 +193,62 @@ export function BannerEditor() {
       setIsSaving(false);
     }
   };
-
-  const embedGoogleFont = async (cssRule: string): Promise<string> => {
-    const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
-    if (!urlMatch) return cssRule;
   
-    const fontUrl = urlMatch[1];
-    try {
-      const res = await fetch(fontUrl);
-      const fontBuffer = await res.arrayBuffer();
-      const fontBase64 = btoa(
-        new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-  
-      return cssRule.replace(urlMatch[1], `data:font/woff2;base64,${fontBase64}`);
-    } catch (e) {
-      console.warn('No se pudo embeder la fuente', fontUrl, e);
-      return cssRule;
-    }
-  };
-
-  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
+const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize = 'medium') => {
     if (!bannerPreviewRef.current) {
         toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
         return;
     }
     setIsDownloading(true);
 
-    const { scale: sizeScale } = DOWNLOAD_SIZES[sizeKey];
-    const { width, height } = bannerDimensions;
-    const fileName = `${text.substring(0, 20) || 'banner'}-${sizeKey}.${format}`;
+    const bannerNode = bannerPreviewRef.current;
+    const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
 
     try {
+        const tempNode = bannerNode.cloneNode(true) as HTMLElement;
+        document.body.appendChild(tempNode);
+
+        // Preload and embed images
+        const images = Array.from(tempNode.getElementsByTagName('img'));
+        for (const img of images) {
+            if (img.src.startsWith('http')) {
+                 try {
+                    const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
+                    const blob = await response.blob();
+                    const dataUrl = await new Promise<string>(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                    });
+                    img.src = dataUrl;
+                } catch (e) {
+                    console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
+                }
+            }
+        }
+        
+        // Embed fonts
         const styleSheets = Array.from(document.styleSheets);
         let cssText = '';
+        const embedGoogleFont = async (cssRule: string): Promise<string> => {
+            const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
+            if (!urlMatch) return cssRule;
+            const fontUrl = urlMatch[1];
+            try {
+                const res = await fetch(fontUrl);
+                const fontBuffer = await res.arrayBuffer();
+                const fontBase64 = btoa(new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+                return cssRule.replace(fontUrl, `data:font/woff2;base64,${fontBase64}`);
+            } catch (e) {
+                console.warn('No se pudo embeder la fuente', fontUrl, e);
+                return cssRule;
+            }
+        };
 
         for (const sheet of styleSheets) {
             try {
-                const rules = sheet.cssRules;
-                if (rules) {
-                    for (const rule of Array.from(rules)) {
+                if (sheet.cssRules) {
+                    for (const rule of Array.from(sheet.cssRules)) {
                         if (rule.cssText.startsWith('@font-face')) {
                             cssText += await embedGoogleFont(rule.cssText);
                         } else {
@@ -204,77 +258,45 @@ export function BannerEditor() {
                 }
             } catch (e) {
                 console.warn('No se pudo acceder a la hoja de estilos, omitiendo: ', e);
-                continue;
             }
         }
-        
         const styleEl = document.createElement('style');
         styleEl.innerHTML = cssText;
-        
-        const dataUrlOptions: htmlToImage.Options = {
-            width,
-            height,
+        tempNode.prepend(styleEl);
+
+        const targetWidth = DOWNLOAD_SIZES[size].width;
+        const scaleFactor = targetWidth / bannerDimensions.width;
+        const targetHeight = bannerDimensions.height * scaleFactor;
+
+        const options = {
+            width: bannerDimensions.width,
+            height: bannerDimensions.height,
             style: {
-              transform: `scale(${sizeScale})`,
-              transformOrigin: 'top left',
-              width: `${width}px`,
-              height: `${height}px`
+                transform: `scale(${scaleFactor})`,
+                transformOrigin: 'top left',
             },
-            pixelRatio: 1,
-            fetchRequestInit: {
-                mode: 'cors',
-                credentials: 'omit',
-            },
-            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            pixelRatio: 2,
         };
 
-        const generateAndDownload = async (generator: (node: HTMLElement, options?: any) => Promise<string>, options: any, ext: 'png' | 'jpeg') => {
-            const tempNode = bannerPreviewRef.current!.cloneNode(true) as HTMLElement;
-            tempNode.prepend(styleEl);
-
-            const images = Array.from(tempNode.getElementsByTagName('img'));
-            for(const img of images){
-                if(img.src.startsWith('http')) {
-                    try {
-                        const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
-                        const blob = await response.blob();
-                        const dataUrl = await new Promise<string>(resolve => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result as string);
-                            reader.readAsDataURL(blob);
-                        });
-                        img.src = dataUrl;
-                    } catch (e) {
-                        console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
-                    }
-                }
-            }
-            
+        if (format === 'pdf') {
+            const jpegData = await htmlToImage.toJpeg(tempNode, { ...options, quality: 0.95 });
+            const doc = new jsPDF({
+                orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [targetWidth, targetHeight],
+            });
+            doc.addImage(jpegData, 'JPEG', 0, 0, targetWidth, targetHeight);
+            doc.save(fileName);
+        } else {
+            const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
             const dataUrl = await generator(tempNode, options);
-            if (ext === 'jpeg' && format === 'pdf') {
-                const doc = new jsPDF({
-                    orientation: width > height ? 'landscape' : 'portrait',
-                    unit: 'px',
-                    format: [width * sizeScale, height * sizeScale],
-                });
-                doc.addImage(dataUrl, 'JPEG', 0, 0, width * sizeScale, height * sizeScale);
-                doc.save(fileName);
-            } else {
-                const link = document.createElement('a');
-                link.download = fileName;
-                link.href = dataUrl;
-                link.click();
-            }
-        };
-
-        if (format === 'png') {
-            await generateAndDownload(htmlToImage.toPng, dataUrlOptions, 'png');
-        } else if (format === 'jpg') {
-            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
-        } else if (format === 'pdf') {
-            await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            link.click();
         }
-
+        
+        document.body.removeChild(tempNode);
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
 
     } catch (error) {
@@ -288,6 +310,69 @@ export function BannerEditor() {
         setIsDownloading(false);
     }
   }, [bannerDimensions, text, toast]);
+
+  const handleAiSuggestions = async () => {
+    if (!bannerImage || !logoImage) {
+      toast({
+        variant: 'destructive',
+        title: 'Faltan Imágenes',
+        description: 'Por favor, sube una imagen de banner y un logo antes de pedir sugerencias.'
+      });
+      return;
+    }
+    setIsSuggesting(true);
+    try {
+      const bannerFile = await (await fetch(bannerImage)).blob();
+      const logoFile = await (await fetch(logoImage)).blob();
+      const bannerImageDataUri = await fileToDataUri(new File([bannerFile], "banner"));
+      const logoImageDataUri = await fileToDataUri(new File([logoFile], "logo"));
+
+      const result = await getPlacementSuggestions({
+        bannerImageDataUri,
+        logoImageDataUri,
+        text,
+      });
+
+      if (result.success) {
+        const { logoPlacement, textPlacement, reasoning } = result.data;
+        
+        // Simple mapping for demonstration. Could be more complex.
+        const placementMap = {
+          'top-left': { x: 15, y: 15 },
+          'top-center': { x: 50, y: 15 },
+          'top-right': { x: 85, y: 15 },
+          'middle-left': { x: 15, y: 50 },
+          'middle-center': { x: 50, y: 50 },
+          'middle-right': { x: 85, y: 50 },
+          'bottom-left': { x: 15, y: 85 },
+          'bottom-center': { x: 50, y: 85 },
+          'bottom-right': { x: 85, y: 85 },
+        };
+        
+        // @ts-ignore
+        if (placementMap[logoPlacement]) setLogoPosition(placementMap[logoPlacement]);
+        // @ts-ignore
+        if (placementMap[textPlacement]) setTextPosition(placementMap[textPlacement]);
+
+        toast({
+          title: 'Sugerencias aplicadas',
+          description: `Razón de la IA: ${reasoning}`,
+        });
+      } else {
+        throw new Error(result.error);
+      }
+
+    } catch(error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Error de IA',
+        description: `No se pudieron obtener las sugerencias. ${error instanceof Error ? error.message : ''}`,
+      });
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
   
   const handleDragMouseDown = (e: React.MouseEvent<HTMLDivElement>, type: 'logo' | 'text') => {
       if (!bannerPreviewRef.current) return;
@@ -390,6 +475,18 @@ export function BannerEditor() {
                     </SelectContent>
                   </Select>
                 </div>
+                {preset === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Ancho (px)</Label>
+                      <Input type="number" value={customDimensions.width} onChange={e => setCustomDimensions(d => ({...d, width: parseInt(e.target.value)}))} className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Alto (px)</Label>
+                      <Input type="number" value={customDimensions.height} onChange={e => setCustomDimensions(d => ({...d, height: parseInt(e.target.value)}))} className="h-8 text-xs" />
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label className="text-xs">Imagen de banner</Label>
                   <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading} className="h-8 text-xs"/>
@@ -476,6 +573,10 @@ export function BannerEditor() {
           </Accordion>
         </CardContent>
         <div className="p-2 space-y-2 border-t">
+          <Button onClick={handleAiSuggestions} disabled={isSuggesting || isUploading || !bannerImage || !logoImage} className="w-full h-9">
+            {isSuggesting ? <Loader2 className="animate-spin mr-2" /> : <Sparkles className="mr-2" />}
+            Sugerir Posición (IA)
+          </Button>
           <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full h-9">
             {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
             Guardar
@@ -489,7 +590,7 @@ export function BannerEditor() {
             </DropdownMenuTrigger>
             <DropdownMenuPortal>
                <DropdownMenuContent align="center" className="w-56">
-                  {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                  {(Object.keys(DOWNLOAD_SIZES) as DownloadSize[]).map((sizeKey) => (
                     <DropdownMenuSub key={sizeKey}>
                       <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
@@ -595,7 +696,3 @@ export function BannerEditor() {
     </div>
   );
 }
-
-    
-
-    
