@@ -4,7 +4,7 @@ import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, LayoutGrid } from "lucide-react";
 import { useRouter } from 'next/navigation';
 
 export function Header() {
@@ -27,13 +27,16 @@ export function Header() {
             </span>
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-end space-x-4">
+        <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
           {user && (
             <>
-              <span className="text-sm text-muted-foreground hidden sm:inline-block">
-                {user.email}
-              </span>
-              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+               <Button variant="outline" asChild>
+                <Link href="/portfolio">
+                  <LayoutGrid className="mr-0 sm:mr-2" />
+                  <span className="hidden sm:inline-block">Portafolio</span>
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
                 <LogOut className="h-5 w-5" />
                 <span className="sr-only">Sign Out</span>
               </Button>
