@@ -84,8 +84,8 @@ export default function SignupPage() {
       const user = userCredential.user;
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
         createdAt: new Date(),
       }, { merge: true }); // Use merge to avoid overwriting data if user already exists
       toast({
