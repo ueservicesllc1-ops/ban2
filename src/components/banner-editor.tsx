@@ -28,25 +28,15 @@ import { cn } from '@/lib/utils';
 import type { SuggestOptimalPlacementsOutput } from '@/ai/flows/suggest-optimal-placements';
 import { getPlacementSuggestions } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { Info, Loader2, Sparkles, Upload, Save, Move } from 'lucide-react';
+import { Info, Loader2, Sparkles, Upload, Save, Move, Download } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/use-auth';
 import { Switch } from '@/components/ui/switch';
-
-const placementClasses: { [key: string]: string } = {
-  'top-left': 'top-4 left-4',
-  'top-center': 'top-4 left-1/2 -translate-x-1/2',
-  'top-right': 'top-4 right-4',
-  'center-left': 'top-1/2 -translate-y-1/2 left-4',
-  center: 'top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2',
-  'center-right': 'top-1/2 -translate-y-1/2 right-4',
-  'bottom-left': 'bottom-4 left-4',
-  'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
-  'bottom-right': 'bottom-4 right-4',
-};
+import * as htmlToImage from 'html-to-image';
+import jsPDF from 'jspdf';
 
 const placementToPercentage = (placement: string): { x: number; y: number } => {
     switch (placement) {
@@ -61,6 +51,12 @@ const placementToPercentage = (placement: string): { x: number; y: number } => {
         case 'bottom-right': return { x: 95, y: 95 };
         default: return { x: 50, y: 50 };
     }
+};
+
+const DOWNLOAD_SIZES = {
+  small: { name: 'Small', scale: 0.5 },
+  medium: { name: 'Medium', scale: 1 },
+  large: { name: 'Large', scale: 2 },
 };
 
 export function BannerEditor() {
@@ -97,10 +93,16 @@ export function BannerEditor() {
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const [logoPosition, setLogoPosition] = useState({ x: 10, y: 10 });
   const [logoSize, setLogoSize] = useState(15);
   const [textPosition, setTextPosition] = useState({ x: 50, y: 50 });
+
+  const [downloadOptions, setDownloadOptions] = useState({
+    format: 'png',
+    size: 'medium',
+  });
 
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
   const draggingElement = useRef<'logo' | 'text' | null>(null);
@@ -258,6 +260,80 @@ export function BannerEditor() {
       toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save banner to Firestore.'});
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!bannerPreviewRef.current) {
+      toast({
+        variant: 'destructive',
+        title: 'Download Failed',
+        description: 'Could not find the banner preview to download.',
+      });
+      return;
+    }
+    setIsDownloading(true);
+
+    const { scale } = DOWNLOAD_SIZES[downloadOptions.size as keyof typeof DOWNLOAD_SIZES];
+    const { width, height } = bannerDimensions;
+    const format = downloadOptions.format;
+
+    try {
+      const options = {
+        canvasWidth: width * scale,
+        canvasHeight: height * scale,
+        style: {
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          width: `${width}px`,
+          height: `${height}px`,
+        },
+        pixelRatio: 1, // We are handling scaling manually via style and canvas dimensions
+        fetchRequestInit: { 
+            headers: new Headers(), // Prevents tainted canvas error for cross-origin images
+            mode: 'cors' as RequestMode, 
+            cache: 'no-cache' as RequestCache,
+        }
+      };
+
+      let dataUrl;
+      const element = bannerPreviewRef.current;
+      const fileName = `banner.${format}`;
+
+      if (format === 'png') {
+        dataUrl = await htmlToImage.toPng(element, { ...options, quality: 1 });
+      } else if (format === 'jpg') {
+        dataUrl = await htmlToImage.toJpeg(element, { ...options, quality: 0.95 });
+      } else if (format === 'pdf') {
+        const pngDataUrl = await htmlToImage.toPng(element, { ...options, quality: 1 });
+        const doc = new jsPDF({
+          orientation: width > height ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [width, height],
+        });
+        doc.addImage(pngDataUrl, 'PNG', 0, 0, width, height);
+        doc.save(fileName);
+        setIsDownloading(false);
+        return;
+      }
+
+      if (dataUrl) {
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+      } else {
+        throw new Error('Could not generate data URL.');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Download Failed',
+        description: 'An error occurred while generating your file. Check console for details.',
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -490,13 +566,50 @@ export function BannerEditor() {
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-6">
-                <AccordionTrigger className="font-headline">6. Save Banner</AccordionTrigger>
-                <AccordionContent className="space-y-4 pt-4">
-                  <p className="text-sm text-muted-foreground">Save your final banner design to the database.</p>
-                   <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Save to Firestore
-                  </Button>
+                <AccordionTrigger className="font-headline">6. Save &amp; Download</AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-4">
+                   <div>
+                     <p className="text-sm text-muted-foreground mb-2">Save your final banner design to the database.</p>
+                     <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Save to Firestore
+                    </Button>
+                   </div>
+                   <div className="space-y-4">
+                      <p className="text-sm font-medium">Download Options</p>
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-2">
+                           <Label htmlFor="download-format">Format</Label>
+                           <Select value={downloadOptions.format} onValueChange={val => setDownloadOptions(o => ({ ...o, format: val }))}>
+                              <SelectTrigger id="download-format">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="png">PNG</SelectItem>
+                                <SelectItem value="jpg">JPG</SelectItem>
+                                <SelectItem value="pdf">PDF</SelectItem>
+                              </SelectContent>
+                           </Select>
+                         </div>
+                         <div className="space-y-2">
+                           <Label htmlFor="download-size">Size</Label>
+                           <Select value={downloadOptions.size} onValueChange={val => setDownloadOptions(o => ({ ...o, size: val }))}>
+                              <SelectTrigger id="download-size">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(DOWNLOAD_SIZES).map(([key, value]) => (
+                                  <SelectItem key={key} value={key}>{value.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                           </Select>
+                         </div>
+                      </div>
+                      <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
+                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Download Banner
+                      </Button>
+                   </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -526,7 +639,7 @@ export function BannerEditor() {
                     </div>
                   )}
                   {bannerImage ? (
-                    <Image src={bannerImage} alt="Banner background" layout="fill" objectFit="cover" unoptimized/>
+                    <Image src={bannerImage} alt="Banner background" layout="fill" objectFit="cover" unoptimized crossOrigin="anonymous"/>
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                       <Upload className="h-10 w-10 mb-2" />
@@ -546,7 +659,7 @@ export function BannerEditor() {
                       onMouseDown={(e) => handleMouseDown(e, 'logo')}
                     >
                       <div className="relative w-full h-full" style={{ aspectRatio: '1 / 1'}}>
-                        <Image src={logoImage} alt="Logo" layout="fill" objectFit="contain" unoptimized/>
+                        <Image src={logoImage} alt="Logo" layout="fill" objectFit="contain" unoptimized crossOrigin="anonymous"/>
                       </div>
                     </div>
                   )}
