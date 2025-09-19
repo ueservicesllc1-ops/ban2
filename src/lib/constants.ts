@@ -30,21 +30,15 @@ export const FONT_OPTIONS = [
   { label: 'Indie Flower', value: 'Indie Flower', isHeadline: true },
 ];
 
-export const BLEND_MODES = [
-  { label: 'Normal', value: 'normal' },
-  { label: 'Multiply', value: 'multiply' },
-  { label: 'Screen', value: 'screen' },
-  { label: 'Overlay', value: 'overlay' },
-  { label: 'Darken', value: 'darken' },
-  { label: 'Lighten', value: 'lighten' },
-  { label: 'Color Dodge', value: 'color-dodge' },
-  { label: 'Color Burn', value: 'color-burn' },
-  { label: 'Hard Light', value: 'hard-light' },
-  { label: 'Soft Light', value: 'soft-light' },
-  { label: 'Difference', value: 'difference' },
-  { label: 'Exclusion', value: 'exclusion' },
-  { label: 'Hue', value: 'hue' },
-  { label: 'Saturation', value: 'saturation' },
-  { label: 'Color', value: 'color' },
-  { label: 'Luminosity', value: 'luminosity' },
-];
+export const FILTER_PRESETS = [
+    { id: 'none', name: 'Ninguno', css: {} },
+    { id: 'bw', name: 'Blanco y Negro', css: { filter: 'grayscale(100%)' } },
+    { id: 'sepia', name: 'Sepia', css: { filter: 'sepia(100%)' } },
+    { id: 'saturate', name: 'Saturado', css: { filter: 'saturate(2)' } },
+    { id: 'vintage', name: 'Vintage', css: { filter: 'sepia(60%) contrast(90%) brightness(90%)' } },
+    { id: 'sunset', name: 'Atardecer', css: { backgroundColor: '#FF8C00', mixBlendMode: 'overlay' } },
+    { id: 'night', name: 'Nocturno', css: { backgroundColor: '#00008B', mixBlendMode: 'multiply' } },
+    { id: 'invert', name: 'Invertir', css: { filter: 'invert(100%)' } },
+]
+
+    

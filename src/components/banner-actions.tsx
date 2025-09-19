@@ -1,7 +1,7 @@
 // src/components/banner-actions.tsx
 'use client'
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { BannerData } from "@/app/portfolio/page";
 import {
   DropdownMenu,
@@ -21,7 +21,7 @@ import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { FONT_OPTIONS, BANNER_PRESETS } from "@/lib/constants";
+import { FONT_OPTIONS, BANNER_PRESETS, FILTER_PRESETS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 
 interface BannerActionsProps {
@@ -132,7 +132,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
     }
   }, [banner, toast]);
 
-  const { textStyle, textEffects, preset, customDimensions, colorFilter } = banner;
+  const { textStyle, textEffects, preset, customDimensions, filter } = banner;
   const bannerDimensions = preset === 'custom' ? customDimensions : (preset && BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS]) || { width: 851, height: 315 };
   
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle?.font)?.isHeadline ? 'font-headline' : 'font-body';
@@ -144,6 +144,9 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
         ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
         : 'none',
   };
+    
+  const selectedFilter = useMemo(() => FILTER_PRESETS.find(f => f.id === filter), [filter]);
+
 
   return (
     <>
@@ -159,18 +162,24 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
               }}
             >
               {banner.bannerImage && (
-                <Image src={banner.bannerImage} alt="Banner background" layout="fill" objectFit="cover" unoptimized crossOrigin="anonymous"/>
-              )}
-
-              {colorFilter?.enabled && (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundColor: colorFilter.color,
-                    opacity: colorFilter.opacity,
-                    mixBlendMode: colorFilter.blendMode as React.CSSProperties['mixBlendMode'],
-                  }}
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={banner.bannerImage}
+                    alt="Banner background"
+                    layout="fill"
+                    objectFit="cover"
+                    unoptimized
+                    crossOrigin="anonymous"
+                    style={{ filter: selectedFilter?.css.filter }}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundColor: selectedFilter?.css.backgroundColor,
+                      mixBlendMode: selectedFilter?.css.mixBlendMode as React.CSSProperties['mixBlendMode'],
+                    }}
+                  />
+                </div>
               )}
 
               {banner.logoImage && banner.logoPosition && (
@@ -261,3 +270,5 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
     </>
   );
 }
+
+    

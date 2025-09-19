@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams, useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import { BANNER_PRESETS, FONT_OPTIONS, BLEND_MODES } from '@/lib/constants';
+import { BANNER_PRESETS, FONT_OPTIONS, FILTER_PRESETS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -42,13 +42,6 @@ const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
   medium: { name: 'Mediano', width: 1080 },
   large: { name: 'Grande', width: 1920 },
 };
-
-const defaultColorFilter = {
-  enabled: false,
-  color: '#8A2BE2',
-  opacity: 0.5,
-  blendMode: 'overlay',
-}
 
 export function BannerEditor() {
   const { toast } = useToast();
@@ -74,7 +67,7 @@ export function BannerEditor() {
     shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 },
     stroke: { enabled: false, color: '#000000', width: 1 },
   });
-  const [colorFilter, setColorFilter] = useState(defaultColorFilter);
+  const [filter, setFilter] = useState('none');
   
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -117,7 +110,7 @@ export function BannerEditor() {
             setTextPosition(data.textPosition || { x: 50, y: 50 });
             setTextStyle(data.textStyle || { font: 'Poppins', size: 48, color: '#FFFFFF' });
             setTextEffects(data.textEffects || { shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 }, stroke: { enabled: false, color: '#000000', width: 1 } });
-            setColorFilter(data.colorFilter || defaultColorFilter);
+            setFilter(data.filter || 'none');
           } else {
             toast({ variant: 'destructive', title: 'Error', description: 'No se encontró el banner para editar.'});
             router.replace('/');
@@ -184,7 +177,7 @@ export function BannerEditor() {
 
     setIsSaving(true);
     try {
-      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, textStyle, textEffects, preset, customDimensions, colorFilter, userId: user.uid };
+      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, textStyle, textEffects, preset, customDimensions, filter, userId: user.uid };
       if (bannerId) {
         const docRef = doc(db, 'users', user.uid, 'banners', bannerId);
         await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
@@ -428,6 +421,8 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
       : 'none',
   };
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
+  
+  const selectedFilter = useMemo(() => FILTER_PRESETS.find(f => f.id === filter), [filter]);
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -437,7 +432,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             <CardTitle className="text-xl font-headline">Editor de Banner</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 space-y-1 p-2 overflow-y-auto">
-            <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
+            <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3', 'item-filter']} className="w-full">
               <AccordionItem value="item-1">
                 <AccordionTrigger className="font-semibold py-1 text-base">Configuración</AccordionTrigger>
                 <AccordionContent className="space-y-1 pt-1">
@@ -476,30 +471,19 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
               <AccordionItem value="item-filter">
                 <AccordionTrigger className="font-semibold py-1 text-base">Filtro de Color</AccordionTrigger>
                 <AccordionContent className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Filtro</Label><Switch checked={colorFilter.enabled} onCheckedChange={c => setColorFilter(f => ({ ...f, enabled: c}))} /></div>
-                  {colorFilter.enabled && <>
                     <div className="space-y-1">
-                      <Label className="text-xs">Color del Filtro</Label>
-                      <div className="flex items-center gap-2">
-                        <Input type="color" value={colorFilter.color} onChange={e => setColorFilter(f => ({ ...f, color: e.target.value }))} className="p-1 h-8 w-10"/>
-                        <Input type="text" value={colorFilter.color} onChange={e => setColorFilter(f => ({ ...f, color: e.target.value }))} className="h-8 text-xs"/>
-                      </div>
-                    </div>
-                    <div className="space-y-1"><Label className="text-xs">Opacidad ({Math.round(colorFilter.opacity * 100)}%)</Label><Slider value={[colorFilter.opacity]} onValueChange={v => setColorFilter(f => ({ ...f, opacity: v[0]}))} min={0} max={1} step={0.01} /></div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Modo de Fusión</Label>
-                      <Select value={colorFilter.blendMode} onValueChange={(mode) => setColorFilter(f => ({ ...f, blendMode: mode }))}>
+                      <Label className="text-xs">Estilo de Filtro</Label>
+                      <Select value={filter} onValueChange={setFilter}>
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                              {BLEND_MODES.map(mode => (
-                                  <SelectItem key={mode.value} value={mode.value} className="text-xs">
-                                      {mode.label}
+                              {FILTER_PRESETS.map(f => (
+                                  <SelectItem key={f.id} value={f.id} className="text-xs">
+                                      {f.name}
                                   </SelectItem>
                               ))}
                           </SelectContent>
                       </Select>
                     </div>
-                  </>}
                 </AccordionContent>
               </AccordionItem>
               
@@ -633,14 +617,24 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             }}
           >
             {bannerImage ? (
-                <Image
-                    src={bannerImage}
-                    alt="Banner"
-                    layout="fill"
-                    objectFit="cover"
-                    unoptimized
-                    crossOrigin="anonymous"
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                      src={bannerImage}
+                      alt="Banner"
+                      layout="fill"
+                      objectFit="cover"
+                      unoptimized
+                      crossOrigin="anonymous"
+                      style={{ filter: selectedFilter?.css.filter }}
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundColor: selectedFilter?.css.backgroundColor,
+                      mixBlendMode: selectedFilter?.css.mixBlendMode as React.CSSProperties['mixBlendMode'],
+                    }}
+                  />
+                </div>
             ) : (
                 <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
                     <h3 className="text-xl font-bold font-headline">{bannerDimensions.name}</h3>
@@ -648,17 +642,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 </div>
             )}
             
-            {colorFilter.enabled && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundColor: colorFilter.color,
-                  opacity: colorFilter.opacity,
-                  mixBlendMode: colorFilter.blendMode as React.CSSProperties['mixBlendMode'],
-                }}
-              />
-            )}
-
             {logoImage && (
               <div
                 className={cn("absolute cursor-move group", { 'cursor-grabbing': isDraggingLogo })}
@@ -715,3 +698,5 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
     </div>
   );
 }
+
+    

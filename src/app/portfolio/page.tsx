@@ -44,12 +44,7 @@ export interface BannerData extends DocumentData {
   };
   preset?: string;
   customDimensions?: { width: number; height: number; };
-  colorFilter?: {
-    enabled: boolean;
-    color: string;
-    opacity: number;
-    blendMode: string;
-  };
+  filter?: string;
 }
 
 function PortfolioPage() {
@@ -148,3 +143,5 @@ function PortfolioPage() {
 }
 
 export default withAuth(PortfolioPage);
+
+    
