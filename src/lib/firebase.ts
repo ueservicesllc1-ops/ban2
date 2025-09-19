@@ -11,7 +11,7 @@ const firebaseConfig = {
   authDomain: "studio-5319012233-f76c3.firebaseapp.com",
   measurementId: "",
   messagingSenderId: "62546233940",
-  storageBucket: "studio-5319012233-f76c3.appspot.com",
+  storageBucket: "studio-5319012233-f76c3.firebasestorage.app",
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
