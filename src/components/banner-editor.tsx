@@ -67,6 +67,15 @@ export function BannerEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [logoPlacement, setLogoPlacement] = useState('top-left');
   const [textPlacement, setTextPlacement] = useState('center');
+  
+  useEffect(() => {
+    // This will run once when the component mounts
+    if (user) {
+      console.log('BannerEditor mounted. User is authenticated:', user.uid);
+    } else {
+      console.log('BannerEditor mounted. User is NOT authenticated.');
+    }
+  }, [user]);
 
   const bannerDimensions = useMemo(() => {
     if (preset === 'custom') {
@@ -216,7 +225,7 @@ export function BannerEditor() {
           <CardContent>
             <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
               <AccordionItem value="item-1">
-                <AccordionTrigger className="font-headline">1. Banner & Size</AccordionTrigger>
+                <AccordionTrigger className="font-headline">1. Banner &amp; Size</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="banner-upload">Banner Image</Label>
@@ -251,7 +260,7 @@ export function BannerEditor() {
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-2">
-                <AccordionTrigger className="font-headline">2. Logo & Text</AccordionTrigger>
+                <AccordionTrigger className="font-headline">2. Logo &amp; Text</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="logo-upload">Logo (PNG)</Label>
