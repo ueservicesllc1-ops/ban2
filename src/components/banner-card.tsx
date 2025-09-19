@@ -7,12 +7,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BannerData } from '@/app/portfolio/page';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { BannerActions } from './banner-actions';
 
 interface BannerCardProps {
   banner: BannerData;
+  onDelete: (bannerId: string) => void;
 }
 
-export function BannerCard({ banner }: BannerCardProps) {
+export function BannerCard({ banner, onDelete }: BannerCardProps) {
     
   const createdAtDate = banner.createdAt?.toDate();
   const timeAgo = createdAtDate 
@@ -20,23 +22,25 @@ export function BannerCard({ banner }: BannerCardProps) {
     : 'hace un momento';
 
   return (
-    <Card className="overflow-hidden group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1">
-      <CardContent className="p-0">
-        <div className="relative aspect-[16/9] bg-muted">
-          <Image
-            src={banner.bannerImage}
-            alt="Banner preview"
-            layout="fill"
-            objectFit="cover"
-            className="transition-transform group-hover:scale-105"
-            unoptimized
-          />
-        </div>
-        <div className="p-4">
-            <p className="text-sm font-medium truncate">{banner.text || 'Sin Título'}</p>
-            <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
-        </div>
-      </CardContent>
+    <Card className="overflow-hidden group transition-all hover:shadow-lg hover:-translate-y-1">
+      <BannerActions banner={banner} onDelete={onDelete}>
+        <CardContent className="p-0 cursor-pointer">
+          <div className="relative aspect-[16/9] bg-muted">
+            <Image
+              src={banner.bannerImage}
+              alt="Banner preview"
+              layout="fill"
+              objectFit="cover"
+              className="transition-transform group-hover:scale-105"
+              unoptimized
+            />
+          </div>
+          <div className="p-4">
+              <p className="text-sm font-medium truncate">{banner.text || 'Sin Título'}</p>
+              <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
+          </div>
+        </CardContent>
+      </BannerActions>
     </Card>
   );
 }

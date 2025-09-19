@@ -1,7 +1,7 @@
 // src/components/banner-editor.tsx
 'use client';
 
-import { useState, useMemo, ChangeEvent, useEffect, useRef } from 'react';
+import { useState, useMemo, ChangeEvent, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Accordion,
@@ -28,15 +28,17 @@ import { cn } from '@/lib/utils';
 import type { SuggestOptimalPlacementsOutput } from '@/ai/flows/suggest-optimal-placements';
 import { getPlacementSuggestions } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { Info, Loader2, Sparkles, Upload, Save, Move, Download } from 'lucide-react';
+import { Info, Loader2, Sparkles, Upload, Save, Download } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/use-auth';
 import { Switch } from '@/components/ui/switch';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { BannerData } from '@/app/portfolio/page';
 
 const placementToPercentage = (placement: string): { x: number; y: number } => {
     switch (placement) {
@@ -62,6 +64,10 @@ const DOWNLOAD_SIZES = {
 export function BannerEditor() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const [bannerId, setBannerId] = useState<string | null>(null);
   
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [logoImage, setLogoImage] = useState<string | null>(null);
@@ -107,13 +113,42 @@ export function BannerEditor() {
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
   const draggingElement = useRef<'logo' | 'text' | null>(null);
 
+  const populateEditor = useCallback((data: BannerData) => {
+    setBannerImage(data.bannerImage);
+    setLogoImage(data.logoImage || null);
+    setText(data.text || '');
+    setTextStyle(data.textStyle || { font: 'Poppins', size: 48, color: '#FFFFFF' });
+    setTextEffects(data.textEffects || { shadow: { enabled: true, color: '#000000', blur: 5, offsetX: 2, offsetY: 2 }, stroke: { enabled: false, color: '#000000', width: 1 } });
+    setPreset(data.preset || 'facebookCover');
+    setCustomDimensions(data.customDimensions || { width: 851, height: 315 });
+    setLogoPosition(data.logoPosition || { x: 10, y: 10 });
+    setLogoSize(data.logoSize || 15);
+    setTextPosition(data.textPosition || { x: 50, y: 50 });
+  }, []);
+
   useEffect(() => {
-    if (user) {
-      console.log('BannerEditor mounted. User is authenticated:', user.uid);
-    } else {
-      console.log('BannerEditor mounted. User is NOT authenticated.');
+    const editBannerId = searchParams.get('edit');
+    if (editBannerId && user) {
+      setBannerId(editBannerId);
+      const fetchBannerData = async () => {
+        try {
+          const bannerDocRef = doc(db, 'users', user.uid, 'banners', editBannerId);
+          const bannerDoc = await getDoc(bannerDocRef);
+          if (bannerDoc.exists()) {
+            populateEditor(bannerDoc.data() as BannerData);
+            toast({ title: 'Banner Cargado', description: 'Tu diseño está listo para ser editado.' });
+          } else {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el banner para editar.' });
+            router.push('/');
+          }
+        } catch (error) {
+          console.error("Error fetching banner for editing:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Hubo un problema al cargar tu diseño.' });
+        }
+      };
+      fetchBannerData();
     }
-  }, [user]);
+  }, [searchParams, user, router, toast, populateEditor]);
 
   const bannerDimensions = useMemo(() => {
     if (preset === 'custom') {
@@ -206,7 +241,6 @@ export function BannerEditor() {
   const urlToDataUri = async (url: string): Promise<string | null> => {
     if (url.startsWith('data:')) return url;
     try {
-      // Using a proxy is not reliable, direct fetch is better.
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch image from URL: ${url}. Status: ${response.status}`);
@@ -240,7 +274,7 @@ export function BannerEditor() {
     }
     setIsSaving(true);
     try {
-      await addDoc(collection(db, 'users', user.uid, 'banners'), {
+      const bannerData = {
         bannerImage,
         logoImage,
         logoPosition,
@@ -251,10 +285,29 @@ export function BannerEditor() {
         textEffects,
         preset,
         customDimensions,
-        createdAt: new Date(),
         userId: user.uid,
-      });
-      toast({ title: 'Banner Saved!', description: 'Your banner configuration has been saved to Firestore.' });
+      };
+
+      if (bannerId) {
+        // Update existing document
+        const bannerDocRef = doc(db, 'users', user.uid, 'banners', bannerId);
+        await updateDoc(bannerDocRef, {
+          ...bannerData,
+          updatedAt: new Date(),
+        });
+        toast({ title: 'Banner Actualizado!', description: 'Tus cambios se han guardado en Firestore.' });
+
+      } else {
+        // Create new document
+        const newDocRef = await addDoc(collection(db, 'users', user.uid, 'banners'), {
+          ...bannerData,
+          createdAt: new Date(),
+        });
+        setBannerId(newDocRef.id);
+        router.replace(`/?edit=${newDocRef.id}`, { scroll: false });
+        toast({ title: 'Banner Guardado!', description: 'Tu banner ha sido guardado en Firestore.' });
+      }
+
     } catch (error) {
       console.error('Error saving banner: ', error);
       toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save banner to Firestore.'});
@@ -288,9 +341,9 @@ export function BannerEditor() {
           width: `${width}px`,
           height: `${height}px`,
         },
-        pixelRatio: 1, // We are handling scaling manually via style and canvas dimensions
+        pixelRatio: 1, 
         fetchRequestInit: { 
-            headers: new Headers(), // Prevents tainted canvas error for cross-origin images
+            headers: new Headers(), 
             mode: 'cors' as RequestMode, 
             cache: 'no-cache' as RequestCache,
         }
@@ -347,11 +400,9 @@ export function BannerEditor() {
 
     const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
     
-    // Calculate position in percentage relative to the banner
     let newX = ((e.clientX - bannerRect.left) / bannerRect.width) * 100;
     let newY = ((e.clientY - bannerRect.top) / bannerRect.height) * 100;
 
-    // Clamp values to stay within the banner
     newX = Math.max(0, Math.min(100, newX));
     newY = Math.max(0, Math.min(100, newY));
 
@@ -367,12 +418,10 @@ export function BannerEditor() {
   };
 
   useEffect(() => {
-    // Add event listeners for mouse move and up to the window
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      // Cleanup the event listeners
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
