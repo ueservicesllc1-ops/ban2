@@ -1,0 +1,19 @@
+# .dockerignore
+
+# Git files
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Next.js build artifacts and cache
+.next
+node_modules
+
+# Local development files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+README.md
