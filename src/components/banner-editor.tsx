@@ -445,7 +445,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
       <div className="flex-1 flex min-h-0">
         <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
           <CardHeader className="py-2 border-b">
-            <CardTitle className="text-xl">Editor de Banner</CardTitle>
+            <CardTitle className="text-xl font-headline">Editor de Banner</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 space-y-1 p-2 overflow-y-auto">
             <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
@@ -670,7 +670,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
               >
                 <p
                   className={cn(headlineFont, 'font-bold whitespace-nowrap', {'text-stroke': textEffects.stroke.enabled})}
-                  style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects.stroke.color, '--tw-stroke-width': `${textEffects.stroke.width}px` } as React.CSSProperties}
+                  style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects.stroke.color, '--tw-stroke-width': `${textEffects.stroke.width}px`, lineHeight: 1.2 } as React.CSSProperties}
                 >
                   {text}
                 </p>

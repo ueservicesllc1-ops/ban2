@@ -73,5 +73,6 @@ body {
 
 /* For text stroke. Tailwind doesn't have a utility for this. */
 .text-stroke {
-  -webkit-text-stroke: 1px black; /* Fallback */
+  -webkit-text-stroke: 1px var(--tw-stroke-color, black);
+  paint-order: stroke fill;
 }

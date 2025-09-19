@@ -44,28 +44,32 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
                                             layout="fill"
                                             objectFit="cover"
                                             className="group-hover:scale-105 transition-transform"
+                                            unoptimized
                                         />
                                         <div className="absolute inset-0 bg-black/30"></div>
                                         
                                         {/* Simplified preview of elements */}
-                                        <div 
-                                            className="absolute" 
-                                            style={{
-                                                top: `${template.logoPosition.y}%`,
-                                                left: `${template.logoPosition.x}%`,
-                                                width: `${template.logoSize}%`,
-                                                transform: 'translate(-50%, -50%)',
-                                            }}
-                                        >
-                                             <div className="relative w-full" style={{paddingBottom: '100%'}}>
-                                                 <Image
-                                                    src={template.logoImage}
-                                                    alt="Logo"
-                                                    layout="fill"
-                                                    objectFit="contain"
-                                                />
+                                        {template.logoImage && (
+                                            <div 
+                                                className="absolute" 
+                                                style={{
+                                                    top: `${template.logoPosition.y}%`,
+                                                    left: `${template.logoPosition.x}%`,
+                                                    width: `${template.logoSize}%`,
+                                                    transform: 'translate(-50%, -50%)',
+                                                }}
+                                            >
+                                                <div className="relative w-full" style={{paddingBottom: '100%'}}>
+                                                    <Image
+                                                        src={template.logoImage}
+                                                        alt="Logo"
+                                                        layout="fill"
+                                                        objectFit="contain"
+                                                        unoptimized
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                         <div
                                             className="absolute p-1"
                                             style={{

@@ -5,20 +5,23 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutGrid } from "lucide-react";
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export function Header() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleSignOut = async () => {
     await signOut();
     router.push('/login');
   };
 
+  const isPortfolioPage = pathname === '/portfolio';
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 max-w-screen-2xl items-center">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-16 flex-shrink-0">
+      <div className="container flex h-full max-w-screen-2xl items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Icons.logo className="h-8 w-8 text-primary" />
@@ -30,7 +33,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
           {user && (
             <>
-               <Button variant="outline" asChild>
+               <Button variant={isPortfolioPage ? "default" : "outline"} asChild>
                 <Link href="/portfolio">
                   <LayoutGrid className="mr-0 sm:mr-2" />
                   <span className="hidden sm:inline-block">Portafolio</span>

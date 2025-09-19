@@ -28,8 +28,8 @@ export const templates: Template[] = [
     {
         id: 'tech-event',
         name: 'Evento Tecnológico',
-        bannerImage: 'https://picsum.photos/seed/tech/1584/396',
-        logoImage: 'https://picsum.photos/seed/logo1/200/200',
+        bannerImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1584&h=396&fit=crop',
+        logoImage: '/logo-placeholder-light.png',
         text: 'INNOVATION SUMMIT 2024',
         preset: 'linkedinBanner',
         logoPosition: { x: 10, y: 50 },
@@ -44,8 +44,8 @@ export const templates: Template[] = [
     {
         id: 'fashion-sale',
         name: 'Venta de Moda',
-        bannerImage: 'https://picsum.photos/seed/fashion/1080/1080',
-        logoImage: 'https://picsum.photos/seed/logo2/200/200',
+        bannerImage: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1080&h=1080&fit=crop',
+        logoImage: '/logo-placeholder-dark.png',
         text: '50% OFF',
         preset: 'instagramPost',
         logoPosition: { x: 50, y: 15 },
@@ -60,8 +60,8 @@ export const templates: Template[] = [
     {
         id: 'restaurant-promo',
         name: 'Promo Restaurante',
-        bannerImage: 'https://picsum.photos/seed/food/851/315',
-        logoImage: 'https://picsum.photos/seed/logo3/200/200',
+        bannerImage: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=851&h=315&fit=crop',
+        logoImage: '/logo-placeholder-light.png',
         text: 'Sabor que Enamora',
         preset: 'facebookCover',
         logoPosition: { x: 85, y: 20 },
@@ -76,8 +76,8 @@ export const templates: Template[] = [
     {
         id: 'travel-story',
         name: 'Blog de Viajes',
-        bannerImage: 'https://picsum.photos/seed/travel/1080/1920',
-        logoImage: 'https://picsum.photos/seed/logo4/200/200',
+        bannerImage: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1080&h=1920&fit=crop',
+        logoImage: '/logo-placeholder-light.png',
         text: 'AVENTURA',
         preset: 'instagramStory',
         logoPosition: { x: 50, y: 90 },
@@ -92,8 +92,8 @@ export const templates: Template[] = [
      {
         id: 'corporate-header',
         name: 'Corporativo',
-        bannerImage: 'https://picsum.photos/seed/corp/1500/500',
-        logoImage: 'https://picsum.photos/seed/logo5/200/200',
+        bannerImage: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1500&h=500&fit=crop',
+        logoImage: '/logo-placeholder-light.png',
         text: 'Liderando el Futuro de la Industria',
         preset: 'twitterHeader',
         logoPosition: { x: 10, y: 50 },
@@ -102,6 +102,22 @@ export const templates: Template[] = [
         textStyle: { font: 'Raleway', size: 52, color: '#FFFFFF' },
         textEffects: {
             shadow: { enabled: true, color: '#00000066', offsetX: 2, offsetY: 2, blur: 4 },
+            stroke: { enabled: false, color: '#000000', width: 1 },
+        }
+    },
+    {
+        id: 'real-estate',
+        name: 'Bienes Raíces de Lujo',
+        bannerImage: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1080&h=1080&fit=crop',
+        logoImage: '/logo-placeholder-dark.png',
+        text: 'TU HOGAR SOÑADO',
+        preset: 'instagramPost',
+        logoPosition: { x: 50, y: 10 },
+        logoSize: 12,
+        textPosition: { x: 50, y: 90 },
+        textStyle: { font: 'Montserrat', size: 80, color: '#252525' },
+        textEffects: {
+            shadow: { enabled: false, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 },
             stroke: { enabled: false, color: '#000000', width: 1 },
         }
     }
