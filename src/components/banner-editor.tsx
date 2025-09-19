@@ -254,7 +254,7 @@ export function BannerEditor() {
   return (
     <div className="flex h-dvh w-full overflow-hidden">
       <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-dvh flex flex-col">
-        <CardHeader className="py-2">
+        <CardHeader className="py-2 border-b">
           <CardTitle className="text-xl">Editor de Banner</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto space-y-1 p-2">
