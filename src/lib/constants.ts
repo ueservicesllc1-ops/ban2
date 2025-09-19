@@ -1,7 +1,7 @@
 export const BANNER_PRESETS = {
   facebookCover: { name: 'Facebook Cover', width: 851, height: 315 },
-  instagramPost: { name: 'Instagram Post', width: 540, height: 540 },
-  instagramStory: { name: 'Instagram Story', width: 540, height: 960 },
+  instagramPost: { name: 'Instagram Post', width: 270, height: 270 },
+  instagramStory: { name: 'Instagram Story', width: 270, height: 480 },
   twitterHeader: { name: 'Twitter Header', width: 1500, height: 500 },
   linkedinBanner: { name: 'LinkedIn Banner', width: 1584, height: 396 },
   youtubeChannel: { name: 'YouTube Channel Art', width: 2560, height: 1440 },
