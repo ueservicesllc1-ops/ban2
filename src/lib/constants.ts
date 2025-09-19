@@ -35,6 +35,8 @@ export const FILTER_PRESETS = [
     { id: 'bw', name: 'Blanco y Negro', css: { filter: 'grayscale(100%)' } },
     { id: 'sepia', name: 'Sepia', css: { filter: 'sepia(100%)' } },
     { id: 'saturate', name: 'Saturado', css: { filter: 'saturate(2)' } },
+    { id: 'vivid', name: 'Vívido', css: { filter: 'saturate(1.5) contrast(1.1)' } },
+    { id: 'romance', name: 'Romance', css: { backgroundColor: 'rgba(255, 105, 180, 0.3)', mixBlendMode: 'overlay' } },
     { id: 'vintage', name: 'Vintage', css: { filter: 'sepia(60%) contrast(90%) brightness(90%)' } },
     { id: 'sunset', name: 'Atardecer', css: { backgroundColor: '#FF8C00', mixBlendMode: 'overlay' } },
     { id: 'night', name: 'Nocturno', css: { backgroundColor: '#00008B', mixBlendMode: 'multiply' } },
