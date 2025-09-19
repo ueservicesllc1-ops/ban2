@@ -76,7 +76,7 @@ export function BannerEditor() {
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; // Corresponds to p-4
+      const padding = 32; 
       const availableWidth = container.clientWidth - padding;
       const availableHeight = container.clientHeight - padding;
       
@@ -91,7 +91,7 @@ export function BannerEditor() {
 
   useEffect(() => {
     updateScale();
-    const debouncedUpdateScale = setTimeout(updateScale, 100); // Debounce for resize
+    const debouncedUpdateScale = setTimeout(updateScale, 100);
     window.addEventListener('resize', updateScale);
     return () => {
       window.removeEventListener('resize', updateScale);
@@ -174,60 +174,60 @@ export function BannerEditor() {
 
   return (
     <div className="flex h-[calc(100vh-65px)] w-full overflow-hidden">
-      {/* Editor Column */}
-      <Card className="rounded-none border-0 border-r flex flex-col w-full lg:w-96 shrink-0 h-full">
+      <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
         <CardHeader>
           <CardTitle>Editor de Banner</CardTitle>
         </CardHeader>
-        <ScrollArea className="flex-1">
-          <CardContent className="space-y-6 pt-0">
-            <div>
-              <Label>Preset</Label>
-              <Select value={preset} onValueChange={(value) => setPreset(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(BANNER_PRESETS).map((key) => (
-                    <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
-                  ))}
-                  <SelectItem value="custom">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <CardContent className="space-y-6">
+              <div>
+                <Label>Preset</Label>
+                <Select value={preset} onValueChange={(value) => setPreset(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un preset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(BANNER_PRESETS).map((key) => (
+                      <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
+                    ))}
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label>Imagen de banner</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
-              {isUploading && <Loader2 className="animate-spin mt-2" />}
-            </div>
+              <div>
+                <Label>Imagen de banner</Label>
+                <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
+                {isUploading && <Loader2 className="animate-spin mt-2" />}
+              </div>
 
-            <div>
-              <Label>Logo</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
-            </div>
+              <div>
+                <Label>Logo</Label>
+                <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
+              </div>
 
-            <div>
-              <Label>Texto</Label>
-              <Textarea value={text} onChange={(e) => setText(e.target.value)} />
-            </div>
+              <div>
+                <Label>Texto</Label>
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} />
+              </div>
 
-            <div className="pt-4 space-y-4">
-              <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
-                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                Guardar
-              </Button>
+              <div className="pt-4 space-y-4">
+                <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
+                  {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+                  Guardar
+                </Button>
 
-              <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
-                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
-                Descargar
-              </Button>
-            </div>
-          </CardContent>
-        </ScrollArea>
+                <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
+                  {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
+                  Descargar
+                </Button>
+              </div>
+            </CardContent>
+          </ScrollArea>
+        </div>
       </Card>
 
-      {/* Preview Column */}
       <div 
         ref={bannerWrapperRef}
         className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0 overflow-hidden"
@@ -287,10 +287,10 @@ export function BannerEditor() {
           >
             <span
               className={cn('whitespace-nowrap font-bold text-center', {
-                'text-transparent': !bannerImage // Hide text if no image
+                'text-transparent': !bannerImage
               })}
               style={{
-                fontSize: `48px` // Example static size, adjust as needed
+                fontSize: `48px`
               }}
             >
               {text}
