@@ -19,6 +19,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import { BANNER_PRESETS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 const DOWNLOAD_SIZES = {
   small: { name: 'Pequeño', scale: 0.5 },
@@ -72,10 +73,10 @@ export function BannerEditor() {
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; // Corresponds to p-4, so 1rem * 2 = 32px
-      const availableWidth = container.offsetWidth - padding;
-      const availableHeight = container.offsetHeight - padding;
-
+      const padding = 32; // p-4 = 1rem * 2 = 32px
+      const availableWidth = container.clientWidth - padding;
+      const availableHeight = container.clientHeight - padding;
+      
       const widthScale = availableWidth / bannerDimensions.width;
       const heightScale = availableHeight / bannerDimensions.height;
       
@@ -86,13 +87,9 @@ export function BannerEditor() {
 
 
   useEffect(() => {
-    // A small delay to ensure the container has its final dimensions
-    const timeoutId = setTimeout(updateScale, 50);
+    updateScale();
     window.addEventListener('resize', updateScale);
-    return () => {
-      window.removeEventListener('resize', updateScale);
-      clearTimeout(timeoutId);
-    };
+    return () => window.removeEventListener('resize', updateScale);
   }, [updateScale]);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
@@ -115,7 +112,12 @@ export function BannerEditor() {
   };
 
   const handleSaveBanner = async () => {
-    if (!bannerImage || !user) return;
+    if (!bannerImage && !user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Por favor, sube una imagen de banner antes de guardar.' });
+        return;
+    };
+    if (!user) return;
+
     setIsSaving(true);
     try {
       const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, preset, customDimensions, userId: user.uid };
@@ -164,62 +166,88 @@ export function BannerEditor() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div className="container mx-auto py-8 h-[calc(100vh-10rem)] flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
         
         <div 
           ref={bannerWrapperRef}
-          className="md:col-span-2 order-2 md:order-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 min-h-[400px]"
+          className="lg:col-span-2 order-2 lg:order-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative"
         >
           <div
             ref={bannerPreviewRef}
-            className="relative overflow-hidden shadow-lg"
+            className="relative overflow-hidden shadow-lg bg-background"
             style={{
               width: `${bannerDimensions.width}px`,
               height: `${bannerDimensions.height}px`,
               transform: `scale(${scale})`,
               transformOrigin: 'center center',
-              backgroundImage: `url(${bannerImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
             }}
           >
-            {logoImage && (
-              <Image
-                src={logoImage}
-                alt="Logo"
-                width={logoSize * 10}
-                height={logoSize * 10}
-                style={{
-                  position: 'absolute',
-                  left: `${logoPosition.x}%`,
-                  top: `${logoPosition.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-              />
+            {bannerImage ? (
+                <Image
+                    src={bannerImage}
+                    alt="Banner"
+                    layout="fill"
+                    objectFit="cover"
+                />
+            ) : (
+                <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
+                    <h3 className="text-2xl font-bold font-headline">{bannerDimensions.name}</h3>
+                    <p className="text-muted-foreground">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
+                </div>
             )}
-            <span
+            
+            {logoImage && (
+              <div
+                className="absolute"
+                style={{
+                    top: `${textPosition.y}%`,
+                    left: `${logoPosition.x}%`,
+                    width: `${logoSize}%`,
+                    transform: 'translate(-50%, -50%)',
+                }}
+              >
+                <div className="relative w-full" style={{paddingBottom: '100%'}}>
+                    <Image
+                        src={logoImage}
+                        alt="Logo"
+                        layout="fill"
+                        objectFit="contain"
+                    />
+                </div>
+              </div>
+
+            )}
+            <div
+              className="absolute"
               style={{
-                position: 'absolute',
-                left: `${textPosition.x}%`,
                 top: `${textPosition.y}%`,
+                left: `${textPosition.x}%`,
                 transform: 'translate(-50%, -50%)',
-                fontSize: `${1 / scale}em` // Compensate text size
               }}
             >
-              {text}
-            </span>
+              <span
+                className={cn('whitespace-nowrap font-bold text-center', {
+                  'text-transparent': !bannerImage // Hide text if no image
+                })}
+                style={{
+                  fontSize: `48px` // Example static size, adjust as needed
+                }}
+              >
+                {text}
+              </span>
+            </div>
           </div>
         </div>
         
-        <Card className="md:col-span-1 order-1 md:order-2 h-fit md:sticky md:top-24">
+        <Card className="lg:col-span-1 order-1 lg:order-2 h-full flex flex-col">
           <CardHeader>
             <CardTitle>Editor de Banner</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 flex-1 overflow-y-auto">
             <div>
               <Label>Preset</Label>
-              <Select value={preset} onValueChange={setPreset}>
+              <Select value={preset} onValueChange={(value) => {setPreset(value); updateScale()}}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un preset" />
                 </SelectTrigger>
@@ -234,12 +262,13 @@ export function BannerEditor() {
 
             <div>
               <Label>Imagen de banner</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} />
+              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
+              {isUploading && <Loader2 className="animate-spin mt-2" />}
             </div>
 
             <div>
               <Label>Logo</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} />
+              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
             </div>
 
             <div>
@@ -247,12 +276,12 @@ export function BannerEditor() {
               <Textarea value={text} onChange={(e) => setText(e.target.value)} />
             </div>
 
-            <Button onClick={handleSaveBanner} disabled={isSaving} className="w-full">
+            <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
               {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
               Guardar
             </Button>
 
-            <Button onClick={handleDownload} disabled={isDownloading} className="w-full">
+            <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
               {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
               Descargar
             </Button>
