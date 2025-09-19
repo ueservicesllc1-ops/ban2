@@ -1,6 +1,7 @@
+// src/components/banner-editor.tsx
 'use client';
 
-import { useState, useMemo, ChangeEvent, useEffect } from 'react';
+import { useState, useMemo, ChangeEvent, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Accordion,
@@ -27,7 +28,7 @@ import { cn } from '@/lib/utils';
 import type { SuggestOptimalPlacementsOutput } from '@/ai/flows/suggest-optimal-placements';
 import { getPlacementSuggestions } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { Info, Loader2, Sparkles, Upload, Save } from 'lucide-react';
+import { Info, Loader2, Sparkles, Upload, Save, Move } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
@@ -46,10 +47,25 @@ const placementClasses: { [key: string]: string } = {
   'bottom-right': 'bottom-4 right-4',
 };
 
+const placementToPercentage = (placement: string): { x: number; y: number } => {
+    switch (placement) {
+        case 'top-left': return { x: 5, y: 5 };
+        case 'top-center': return { x: 50, y: 5 };
+        case 'top-right': return { x: 95, y: 5 };
+        case 'center-left': return { x: 5, y: 50 };
+        case 'center': return { x: 50, y: 50 };
+        case 'center-right': return { x: 95, y: 50 };
+        case 'bottom-left': return { x: 5, y: 95 };
+        case 'bottom-center': return { x: 50, y: 95 };
+        case 'bottom-right': return { x: 95, y: 95 };
+        default: return { x: 5, y: 5 };
+    }
+};
+
 export function BannerEditor() {
   const { toast } = useToast();
   const { user } = useAuth();
-
+  
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [text, setText] = useState('Your Text Here');
@@ -65,7 +81,15 @@ export function BannerEditor() {
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [logoPlacement, setLogoPlacement] = useState('top-left');
+  
+  // States for logo drag and resize
+  const [logoPosition, setLogoPosition] = useState({ x: 10, y: 10 }); // in percentage
+  const [logoSize, setLogoSize] = useState(15); // in percentage of banner width
+  const isDragging = useRef(false);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const bannerPreviewRef = useRef<HTMLDivElement>(null);
+
+
   const [textPlacement, setTextPlacement] = useState('center');
   
   useEffect(() => {
@@ -146,7 +170,9 @@ export function BannerEditor() {
       setAiSuggestions(result.data);
       const suggestedLogoPlacement = result.data.logoPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
       const suggestedTextPlacement = result.data.textPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
-      setLogoPlacement(placementClasses[suggestedLogoPlacement] ? suggestedLogoPlacement : 'top-left');
+      
+      const logoPos = placementToPercentage(suggestedLogoPlacement);
+      setLogoPosition(logoPos);
       setTextPlacement(placementClasses[suggestedTextPlacement] ? suggestedTextPlacement : 'center');
       toast({
         title: 'Suggestions Received!',
@@ -165,9 +191,9 @@ export function BannerEditor() {
   
   const urlToDataUri = async (url: string): Promise<string | null> => {
     if (url.startsWith('data:')) return url;
-    // Use a CORS proxy for fetching external images if needed, but Firebase URLs should be fine
     try {
-      const response = await fetch(url);
+      // Using a proxy to avoid CORS issues when converting images from other origins
+      const response = await fetch(`https://cors-anywhere.herokuapp.com/${url}`);
       const blob = await response.blob();
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -177,7 +203,20 @@ export function BannerEditor() {
       });
     } catch (error) {
       console.error("Error converting URL to data URI:", error);
-      return null;
+      // Fallback for direct fetch if proxy fails or for same-origin requests
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.error("Direct fetch also failed:", e);
+        return null;
+      }
     }
   };
 
@@ -195,12 +234,13 @@ export function BannerEditor() {
       await addDoc(collection(db, 'users', user.uid, 'banners'), {
         bannerImage,
         logoImage,
+        logoPosition,
+        logoSize,
         text,
         textStyle,
+        textPlacement,
         preset,
         customDimensions,
-        logoPlacement,
-        textPlacement,
         createdAt: new Date(),
         userId: user.uid,
       });
@@ -212,6 +252,48 @@ export function BannerEditor() {
       setIsSaving(false);
     }
   };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!bannerPreviewRef.current) return;
+    isDragging.current = true;
+    
+    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+    dragStartPos.current = {
+      x: e.clientX,
+      y: e.clientY,
+      offsetX: e.clientX - bannerRect.left - (logoPosition.x / 100) * bannerRect.width,
+      offsetY: e.clientY - bannerRect.top - (logoPosition.y / 100) * bannerRect.height,
+    };
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging.current || !bannerPreviewRef.current) return;
+
+    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+    let newX = ((e.clientX - bannerRect.left) / bannerRect.width) * 100;
+    let newY = ((e.clientY - bannerRect.top) / bannerRect.height) * 100;
+
+    // Clamp values to stay within the banner
+    newX = Math.max(0, Math.min(100, newX));
+    newY = Math.max(0, Math.min(100, newY));
+
+    setLogoPosition({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
@@ -265,6 +347,16 @@ export function BannerEditor() {
                   <div className="space-y-2">
                     <Label htmlFor="logo-upload">Logo (PNG)</Label>
                     <Input id="logo-upload" type="file" accept="image/png" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Logo Size: {logoSize.toFixed(0)}%</Label>
+                    <Slider
+                      value={[logoSize]}
+                      onValueChange={([val]) => setLogoSize(val)}
+                      min={5}
+                      max={50}
+                      step={1}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="text-input">Overlay Text</Label>
@@ -342,6 +434,7 @@ export function BannerEditor() {
             <CardContent className="p-2 sm:p-6 flex-1 flex items-center justify-center w-full">
                <div className="relative w-full h-full flex items-center justify-center">
                 <div
+                  ref={bannerPreviewRef}
                   className="relative overflow-hidden bg-muted/50 rounded-lg shadow-inner"
                   style={{
                     aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
@@ -351,7 +444,7 @@ export function BannerEditor() {
                   }}
                 >
                   {isUploading && (
-                    <div className="absolute inset-0 z-10 bg-background/80 flex items-center justify-center">
+                    <div className="absolute inset-0 z-20 bg-background/80 flex items-center justify-center">
                       <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     </div>
                   )}
@@ -365,15 +458,24 @@ export function BannerEditor() {
                   )}
 
                   {logoImage && (
-                    <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
-                      <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
-                        <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} unoptimized/>
+                    <div
+                      className="absolute cursor-move z-10"
+                      style={{
+                        left: `${logoPosition.x}%`,
+                        top: `${logoPosition.y}%`,
+                        width: `${logoSize}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      onMouseDown={handleMouseDown}
+                    >
+                      <div className="relative w-full h-full" style={{ aspectRatio: '1 / 1'}}>
+                        <Image src={logoImage} alt="Logo" layout="fill" objectFit="contain" unoptimized/>
                       </div>
                     </div>
                   )}
 
                   {bannerImage && text && (
-                    <div className={cn('absolute transition-all duration-500 ease-in-out p-2', placementClasses[textPlacement])}>
+                    <div className={cn('absolute transition-all duration-500 ease-in-out p-2 z-10', placementClasses[textPlacement])}>
                       <p
                         className={cn(headlineFont, 'font-bold drop-shadow-lg')}
                         style={{
