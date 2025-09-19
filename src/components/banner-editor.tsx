@@ -223,7 +223,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
 
       document.body.appendChild(clonedNode);
       
-      // Embed images as data URIs
+      // Embed images as data URIs to prevent blank images
       const images = Array.from(clonedNode.getElementsByTagName('img'));
       for (const img of images) {
           if (img.src && img.src.startsWith('http')) {
@@ -237,6 +237,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                       reader.readAsDataURL(blob);
                   });
                   img.src = dataUrl;
+                  img.crossOrigin = 'anonymous'; // Ensure it's treated correctly
               } catch (e) {
                   console.warn(`Could not embed image: ${img.src}`, e);
               }
