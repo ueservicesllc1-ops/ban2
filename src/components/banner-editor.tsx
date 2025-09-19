@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, Download } from 'lucide-react';
+import { Loader2, Save, Download, Move } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,26 +22,12 @@ import jsPDF from 'jspdf';
 import { BANNER_PRESETS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Slider } from '@/components/ui/slider';
 
 const DOWNLOAD_SIZES = {
   small: { name: 'Pequeño', scale: 0.5 },
   medium: { name: 'Mediano', scale: 1 },
   large: { name: 'Grande', scale: 2 },
-};
-
-const placementToPercentage = (placement: string) => {
-  const map: { [key: string]: { x: number; y: number } } = {
-    'top-left': { x: 15, y: 15 },
-    'top-center': { x: 50, y: 15 },
-    'top-right': { x: 85, y: 15 },
-    'center-left': { x: 15, y: 50 },
-    'center': { x: 50, y: 50 },
-    'center-right': { x: 85, y: 50 },
-    'bottom-left': { x: 15, y: 85 },
-    'bottom-center': { x: 50, y: 85 },
-    'bottom-right': { x: 85, y: 85 },
-  };
-  return map[placement] || { x: 50, y: 50 };
 };
 
 export function BannerEditor() {
@@ -63,6 +49,9 @@ export function BannerEditor() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  
+  const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
   const bannerWrapperRef = useRef<HTMLDivElement>(null);
@@ -76,7 +65,7 @@ export function BannerEditor() {
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; 
+      const padding = 32;
       const availableWidth = container.clientWidth - padding;
       const availableHeight = container.clientHeight - padding;
       
@@ -171,6 +160,58 @@ export function BannerEditor() {
       setIsDownloading(false);
     }
   };
+  
+    const handleLogoMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!bannerPreviewRef.current) return;
+    setIsDraggingLogo(true);
+    const logoEl = e.currentTarget;
+    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+    const logoRect = logoEl.getBoundingClientRect();
+
+    const offsetX = (e.clientX - logoRect.left) / scale;
+    const offsetY = (e.clientY - logoRect.top) / scale;
+    dragOffsetRef.current = { x: offsetX, y: offsetY };
+    
+    e.preventDefault();
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingLogo || !bannerPreviewRef.current) return;
+
+    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+    let newX = (e.clientX - bannerRect.left) / scale - dragOffsetRef.current.x;
+    let newY = (e.clientY - bannerRect.top) / scale - dragOffsetRef.current.y;
+
+    const logoWidth = (bannerDimensions.width * logoSize) / 100;
+    const logoHeight = (bannerDimensions.width * logoSize) / 100;
+
+    let newXPercent = ((newX + logoWidth / 2) / bannerDimensions.width) * 100;
+    let newYPercent = ((newY + logoHeight / 2) / bannerDimensions.height) * 100;
+
+    newXPercent = Math.max(0, Math.min(100, newXPercent));
+    newYPercent = Math.max(0, Math.min(100, newYPercent));
+
+    setLogoPosition({ x: newXPercent, y: newYPercent });
+  }, [isDraggingLogo, scale, logoSize, bannerDimensions]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDraggingLogo(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDraggingLogo) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingLogo, handleMouseMove, handleMouseUp]);
+
 
   return (
     <div className="flex h-[calc(100vh-65px)] w-full overflow-hidden">
@@ -206,6 +247,19 @@ export function BannerEditor() {
                 <Label>Logo</Label>
                 <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
               </div>
+
+               {logoImage && (
+                <div className="space-y-2">
+                  <Label>Tamaño del Logo</Label>
+                  <Slider
+                    value={[logoSize]}
+                    onValueChange={(value) => setLogoSize(value[0])}
+                    max={50}
+                    min={5}
+                    step={1}
+                  />
+                </div>
+              )}
 
               <div>
                 <Label>Texto</Label>
@@ -258,13 +312,14 @@ export function BannerEditor() {
           
           {logoImage && (
             <div
-              className="absolute"
+              className={cn("absolute cursor-move", { 'cursor-grabbing': isDraggingLogo })}
               style={{
                   top: `${logoPosition.y}%`,
                   left: `${logoPosition.x}%`,
                   width: `${logoSize}%`,
                   transform: 'translate(-50%, -50%)',
               }}
+              onMouseDown={handleLogoMouseDown}
             >
               <div className="relative w-full" style={{paddingBottom: '100%'}}>
                   <Image
@@ -272,7 +327,11 @@ export function BannerEditor() {
                       alt="Logo"
                       layout="fill"
                       objectFit="contain"
+                      className="pointer-events-none"
                   />
+              </div>
+              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <Move size={12} />
               </div>
             </div>
 
@@ -302,3 +361,5 @@ export function BannerEditor() {
     </div>
   );
 }
+
+    
