@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, ChangeEvent } from 'react';
+import { useState, useMemo, ChangeEvent, useEffect } from 'react';
 import Image from 'next/image';
 import {
   Accordion,
@@ -23,7 +23,7 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BANNER_PRESETS, FONT_OPTIONS } from '@/lib/constants';
-import { cn, fileToDataUri } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { SuggestOptimalPlacementsOutput } from '@/ai/flows/suggest-optimal-placements';
 import { getPlacementSuggestions } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
-
+import { useAuth } from '@/hooks/use-auth';
 
 const placementClasses: { [key: string]: string } = {
   'top-left': 'top-4 left-4',
@@ -48,6 +48,7 @@ const placementClasses: { [key: string]: string } = {
 
 export function BannerEditor() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [bannerImage, setBannerImage] = useState<string | null>(null);
   const [logoImage, setLogoImage] = useState<string | null>(null);
@@ -76,10 +77,10 @@ export function BannerEditor() {
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && user) {
       setIsUploading(true);
       try {
-        const fileRef = ref(storage, `images/${uuidv4()}-${file.name}`);
+        const fileRef = ref(storage, `images/${user.uid}/${uuidv4()}-${file.name}`);
         await uploadBytes(fileRef, file);
         const downloadURL = await getDownloadURL(fileRef);
         setImage(downloadURL);
@@ -113,7 +114,6 @@ export function BannerEditor() {
     setIsLoadingAi(true);
     setAiSuggestions(null);
 
-    // AI flow needs data URIs, so we'll fetch them if they are Firebase URLs
     const bannerDataUri = await urlToDataUri(bannerImage);
     const logoDataUri = await urlToDataUri(logoImage);
 
@@ -135,8 +135,10 @@ export function BannerEditor() {
 
     if (result.success) {
       setAiSuggestions(result.data);
-      setLogoPlacement(result.data.logoPlacement.toLowerCase().replace('_', '-'));
-      setTextPlacement(result.data.textPlacement.toLowerCase().replace('_', '-'));
+      const suggestedLogoPlacement = result.data.logoPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
+      const suggestedTextPlacement = result.data.textPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
+      setLogoPlacement(placementClasses[suggestedLogoPlacement] ? suggestedLogoPlacement : 'top-left');
+      setTextPlacement(placementClasses[suggestedTextPlacement] ? suggestedTextPlacement : 'center');
       toast({
         title: 'Suggestions Received!',
         description: 'AI placements have been applied to your banner.',
@@ -154,22 +156,20 @@ export function BannerEditor() {
   
   const urlToDataUri = async (url: string): Promise<string | null> => {
     if (url.startsWith('data:')) return url;
-    if (url.startsWith('http')) {
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      } catch (error) {
-        console.error("Error converting URL to data URI:", error);
-        return null;
-      }
+    // Use a CORS proxy for fetching external images if needed, but Firebase URLs should be fine
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error converting URL to data URI:", error);
+      return null;
     }
-    return url;
   };
 
   const handleSaveBanner = async () => {
@@ -177,9 +177,13 @@ export function BannerEditor() {
       toast({ variant: 'destructive', title: 'Cannot Save', description: 'Please upload a banner image before saving.'});
       return;
     }
+     if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to save.'});
+      return;
+    }
     setIsSaving(true);
     try {
-      await addDoc(collection(db, 'banners'), {
+      await addDoc(collection(db, 'users', user.uid, 'banners'), {
         bannerImage,
         logoImage,
         text,
@@ -189,6 +193,7 @@ export function BannerEditor() {
         logoPlacement,
         textPlacement,
         createdAt: new Date(),
+        userId: user.uid,
       });
       toast({ title: 'Banner Saved!', description: 'Your banner configuration has been saved to Firestore.' });
     } catch (error) {
@@ -202,7 +207,7 @@ export function BannerEditor() {
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
-    <div className="container py-8">
+    <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-1 h-fit">
           <CardHeader>
@@ -326,51 +331,54 @@ export function BannerEditor() {
               <CardTitle className="font-headline text-2xl">Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-2 sm:p-6 flex-1 flex items-center justify-center w-full">
-              <div
-                className="relative w-full max-w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner"
-                style={{
-                  aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
-                  maxHeight: 'calc(100vh - 300px)',
-                  maxWidth: `calc((100vh - 300px) * (${bannerDimensions.width} / ${bannerDimensions.height}))`
-                }}
-              >
-                {isUploading && (
-                  <div className="absolute inset-0 z-10 bg-background/80 flex items-center justify-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                  </div>
-                )}
-                {bannerImage ? (
-                  <Image src={bannerImage} alt="Banner background" fill style={{ objectFit: 'cover' }} unoptimized/>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                    <Upload className="h-10 w-10 mb-2" />
-                    <span>Upload a banner image to start</span>
-                  </div>
-                )}
-
-                {logoImage && (
-                  <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
-                    <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
-                       <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} unoptimized/>
+               <div className="relative w-full h-full flex items-center justify-center">
+                <div
+                  className="relative overflow-hidden bg-muted/50 rounded-lg shadow-inner"
+                  style={{
+                    aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
+                    width: '100%',
+                    maxWidth: `min(100%, ${bannerDimensions.width}px)`,
+                    maxHeight: 'calc(100vh - 240px)', 
+                  }}
+                >
+                  {isUploading && (
+                    <div className="absolute inset-0 z-10 bg-background/80 flex items-center justify-center">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     </div>
-                  </div>
-                )}
+                  )}
+                  {bannerImage ? (
+                    <Image src={bannerImage} alt="Banner background" layout="fill" objectFit="cover" unoptimized/>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                      <Upload className="h-10 w-10 mb-2" />
+                      <span>Upload a banner image to start</span>
+                    </div>
+                  )}
 
-                {bannerImage && text && (
-                  <div className={cn('absolute transition-all duration-500 ease-in-out p-2', placementClasses[textPlacement])}>
-                    <p
-                      className={cn(headlineFont, 'font-bold drop-shadow-lg')}
-                      style={{
-                        fontFamily: `'${textStyle.font}', sans-serif`,
-                        fontSize: `${textStyle.size}px`,
-                        color: textStyle.color,
-                        lineHeight: 1.2
-                      }}
-                    >
-                      {text}
-                    </p>
-                  </div>
-                )}
+                  {logoImage && (
+                    <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
+                      <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
+                        <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} unoptimized/>
+                      </div>
+                    </div>
+                  )}
+
+                  {bannerImage && text && (
+                    <div className={cn('absolute transition-all duration-500 ease-in-out p-2', placementClasses[textPlacement])}>
+                      <p
+                        className={cn(headlineFont, 'font-bold drop-shadow-lg')}
+                        style={{
+                          fontFamily: `'${textStyle.font}', sans-serif`,
+                          fontSize: `${textStyle.size}px`,
+                          color: textStyle.color,
+                          lineHeight: 1.2
+                        }}
+                      >
+                        {text}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

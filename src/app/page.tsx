@@ -1,7 +1,8 @@
 import { BannerEditor } from '@/components/banner-editor';
 import { Header } from '@/components/header';
+import { withAuth } from '@/components/with-auth';
 
-export default function Home() {
+function HomePage() {
   return (
     <div className="flex flex-col min-h-dvh bg-background">
       <Header />
@@ -11,3 +12,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default withAuth(HomePage);
