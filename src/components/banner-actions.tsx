@@ -59,36 +59,36 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     const fileName = `${banner.text?.substring(0, 20) || 'banner'}.${format}`;
 
     try {
-        const fontFamilies = FONT_OPTIONS.map(f => f.value);
-        const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
-            fontFamilies,
-            fetchRequestInit: {
-                mode: 'cors',
-                credentials: 'omit',
-            }
-        });
+      const fontFamilies = FONT_OPTIONS.map(f => f.value);
+      const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
+          fontFamilies,
+          fetchRequestInit: {
+              mode: 'cors',
+              credentials: 'omit',
+          }
+      });
 
-        const options = {
-            width: width,
-            height: height,
-            canvasWidth: width * scale,
-            canvasHeight: height * scale,
-            style: {
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            },
-            pixelRatio: 1,
-            fetchRequestInit: {
-              mode: 'cors' as RequestMode,
-              credentials: 'omit' as RequestCredentials,
-            },
-            fontEmbedCSS: fontCSS,
-            // The library fails to capture images from Firebase storage unless we provide this.
-            // It's a known issue with CORS and external images.
-            filter: (node: HTMLElement) => {
-              return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
-            }
-        };
+      const options = {
+          width: width,
+          height: height,
+          canvasWidth: width * scale,
+          canvasHeight: height * scale,
+          style: {
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          },
+          pixelRatio: 1,
+          fetchRequestInit: {
+            mode: 'cors' as RequestMode,
+            credentials: 'omit' as RequestCredentials,
+          },
+          fontEmbedCSS: fontCSS,
+          // The library fails to capture images from Firebase storage unless we provide this.
+          // It's a known issue with CORS and external images.
+          filter: (node: HTMLElement) => {
+            return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
+          }
+      };
 
       let dataUrl;
       
