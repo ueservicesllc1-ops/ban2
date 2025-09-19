@@ -566,13 +566,13 @@ export function BannerEditor() {
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-6">
-                <AccordionTrigger className="font-headline">6. Save &amp; Download</AccordionTrigger>
+                <AccordionTrigger className="font-headline">6. Guardar y Descargar</AccordionTrigger>
                 <AccordionContent className="space-y-6 pt-4">
                    <div>
-                     <p className="text-sm text-muted-foreground mb-2">Save your final banner design to the database.</p>
+                     <p className="text-sm text-muted-foreground mb-2">Guarda el diseño final de tu banner en tu portafolio.</p>
                      <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
                       {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                      Save to Firestore
+                      Guardar en Portafolio
                     </Button>
                    </div>
                    <div className="space-y-4">
