@@ -34,6 +34,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/use-auth';
+import { Switch } from '@/components/ui/switch';
 
 const placementClasses: { [key: string]: string } = {
   'top-left': 'top-4 left-4',
@@ -74,6 +75,21 @@ export function BannerEditor() {
     size: 48,
     color: '#FFFFFF',
   });
+  const [textEffects, setTextEffects] = useState({
+    shadow: {
+      enabled: true,
+      color: '#000000',
+      blur: 5,
+      offsetX: 2,
+      offsetY: 2,
+    },
+    stroke: {
+      enabled: false,
+      color: '#000000',
+      width: 1,
+    }
+  });
+
   const [preset, setPreset] = useState('facebookCover');
   const [customDimensions, setCustomDimensions] = useState({ width: 851, height: 315 });
 
@@ -230,6 +246,7 @@ export function BannerEditor() {
         text,
         textStyle,
         textPosition,
+        textEffects,
         preset,
         customDimensions,
         createdAt: new Date(),
@@ -286,6 +303,17 @@ export function BannerEditor() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
+  const textPreviewStyles = {
+      fontFamily: `'${textStyle.font}', sans-serif`,
+      fontSize: `${textStyle.size}px`,
+      color: textStyle.color,
+      textShadow: textEffects.shadow.enabled
+        ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
+        : 'none',
+      WebkitTextStroke: textEffects.stroke.enabled
+        ? `${textEffects.stroke.width}px ${textEffects.stroke.color}`
+        : 'unset',
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -383,8 +411,67 @@ export function BannerEditor() {
                   </div>
                 </AccordionContent>
               </AccordionItem>
-               <AccordionItem value="item-4">
-                <AccordionTrigger className="font-headline">4. AI Smart Suggestions</AccordionTrigger>
+              <AccordionItem value="item-4">
+                <AccordionTrigger className="font-headline">4. Text Effects</AccordionTrigger>
+                <AccordionContent className="space-y-6 pt-4">
+                  {/* Shadow Controls */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="shadow-enable" className="font-medium">Text Shadow</Label>
+                      <Switch id="shadow-enable" checked={textEffects.shadow.enabled} onCheckedChange={checked => setTextEffects(e => ({...e, shadow: {...e.shadow, enabled: checked}}))} />
+                    </div>
+                    {textEffects.shadow.enabled && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="shadow-color">Shadow Color</Label>
+                          <div className="flex items-center gap-2">
+                            <Input id="shadow-color" type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(s => ({...s, shadow: {...s.shadow, color: e.target.value}}))} className="p-1 h-10 w-14" />
+                            <Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(s => ({...s, shadow: {...s.shadow, color: e.target.value}}))} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Offset X: {textEffects.shadow.offsetX}px</Label>
+                            <Slider value={[textEffects.shadow.offsetX]} onValueChange={([val]) => setTextEffects(e => ({...e, shadow: {...e.shadow, offsetX: val}}))} min={-10} max={10} step={1} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Offset Y: {textEffects.shadow.offsetY}px</Label>
+                            <Slider value={[textEffects.shadow.offsetY]} onValueChange={([val]) => setTextEffects(e => ({...e, shadow: {...e.shadow, offsetY: val}}))} min={-10} max={10} step={1} />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Blur: {textEffects.shadow.blur}px</Label>
+                          <Slider value={[textEffects.shadow.blur]} onValueChange={([val]) => setTextEffects(e => ({...e, shadow: {...e.shadow, blur: val}}))} min={0} max={20} step={1} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Stroke Controls */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                     <div className="flex items-center justify-between">
+                      <Label htmlFor="stroke-enable" className="font-medium">Text Border</Label>
+                      <Switch id="stroke-enable" checked={textEffects.stroke.enabled} onCheckedChange={checked => setTextEffects(e => ({...e, stroke: {...e.stroke, enabled: checked}}))} />
+                    </div>
+                    {textEffects.stroke.enabled && (
+                       <div className="space-y-4">
+                         <div className="space-y-2">
+                            <Label htmlFor="stroke-color">Border Color</Label>
+                            <div className="flex items-center gap-2">
+                              <Input id="stroke-color" type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(s => ({...s, stroke: {...s.stroke, color: e.target.value}}))} className="p-1 h-10 w-14" />
+                              <Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(s => ({...s, stroke: {...s.stroke, color: e.target.value}}))} />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Border Width: {textEffects.stroke.width}px</Label>
+                          <Slider value={[textEffects.stroke.width]} onValueChange={([val]) => setTextEffects(e => ({...e, stroke: {...e.stroke, width: val}}))} min={0.5} max={5} step={0.5} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+               <AccordionItem value="item-5">
+                <AccordionTrigger className="font-headline">5. AI Smart Suggestions</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   <p className="text-sm text-muted-foreground">Let our AI suggest the optimal placement for your logo and text for maximum impact.</p>
                   <Button onClick={handleGetSuggestions} disabled={isLoadingAi || isUploading} className="w-full bg-accent hover:bg-accent/90">
@@ -402,8 +489,8 @@ export function BannerEditor() {
                   )}
                 </AccordionContent>
               </AccordionItem>
-              <AccordionItem value="item-5">
-                <AccordionTrigger className="font-headline">5. Save Banner</AccordionTrigger>
+              <AccordionItem value="item-6">
+                <AccordionTrigger className="font-headline">6. Save Banner</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   <p className="text-sm text-muted-foreground">Save your final banner design to the database.</p>
                    <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
@@ -475,13 +562,11 @@ export function BannerEditor() {
                       onMouseDown={(e) => handleMouseDown(e, 'text')}
                     >
                       <p
-                        className={cn(headlineFont, 'font-bold drop-shadow-lg whitespace-nowrap')}
+                        className={cn(headlineFont, 'font-bold whitespace-nowrap')}
                         style={{
-                          fontFamily: `'${textStyle.font}', sans-serif`,
-                          fontSize: `${textStyle.size}px`,
-                          color: textStyle.color,
+                          ...textPreviewStyles,
                           lineHeight: 1.2
-                        }}
+                        } as React.CSSProperties}
                       >
                         {text}
                       </p>
