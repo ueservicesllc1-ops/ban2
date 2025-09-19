@@ -257,11 +257,11 @@ export function BannerEditor() {
         <CardHeader className="py-2 border-b">
           <CardTitle className="text-xl">Editor de Banner</CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto space-y-1 p-2">
+        <CardContent className="flex-1 space-y-1 p-2">
           <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
             <AccordionItem value="item-1">
-              <AccordionTrigger className="font-semibold py-2 text-base">Configuración</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
+              <AccordionTrigger className="font-semibold py-1 text-base">Configuración</AccordionTrigger>
+              <AccordionContent className="space-y-1 pt-1">
                 <div className="space-y-1">
                   <Label className="text-xs">Preset</Label>
                   <Select value={preset} onValueChange={(value) => setPreset(value)}>
@@ -283,8 +283,8 @@ export function BannerEditor() {
             </AccordionItem>
 
             <AccordionItem value="item-2">
-              <AccordionTrigger className="font-semibold py-2 text-base">Logo</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
+              <AccordionTrigger className="font-semibold py-1 text-base">Logo</AccordionTrigger>
+              <AccordionContent className="space-y-1 pt-1">
                 <div className="space-y-1">
                   <Label className="text-xs">Imagen del Logo</Label>
                   <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading} className="h-8 text-xs"/>
@@ -300,8 +300,8 @@ export function BannerEditor() {
             </AccordionItem>
             
             <AccordionItem value="item-3">
-              <AccordionTrigger className="font-semibold py-2 text-base">Texto</AccordionTrigger>
-              <AccordionContent className="space-y-2 pt-1">
+              <AccordionTrigger className="font-semibold py-1 text-base">Texto</AccordionTrigger>
+              <AccordionContent className="space-y-1 pt-1">
                 <div className="space-y-1">
                   <Label className="text-xs">Contenido</Label>
                   <Textarea value={text} onChange={(e) => setText(e.target.value)} className="text-xs min-h-[60px]" />
