@@ -67,13 +67,14 @@ export function BannerEditor() {
   const [scale, setScale] = useState(1);
   
   const bannerDimensions = useMemo(() => {
-    return preset === 'custom' ? customDimensions : BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS];
+    if (preset === 'custom') return customDimensions;
+    return BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS] || BANNER_PRESETS.facebookCover;
   }, [preset, customDimensions]);
 
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; // p-4 = 1rem * 2 = 32px
+      const padding = 32; // p-4 on container
       const availableWidth = container.clientWidth - padding;
       const availableHeight = container.clientHeight - padding;
       
@@ -166,12 +167,13 @@ export function BannerEditor() {
   };
 
   return (
-    <div className="container mx-auto py-8 h-[calc(100vh-10rem)] flex flex-col">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
+    <div className="container mx-auto py-8 h-[calc(100vh-8rem)]">
+      <div className="flex flex-col lg:flex-row gap-8 h-full">
         
+        {/* Preview Column */}
         <div 
           ref={bannerWrapperRef}
-          className="lg:col-span-2 order-2 lg:order-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative"
+          className="flex-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative min-h-0 order-2 lg:order-1"
         >
           <div
             ref={bannerPreviewRef}
@@ -240,7 +242,8 @@ export function BannerEditor() {
           </div>
         </div>
         
-        <Card className="lg:col-span-1 order-1 lg:order-2 h-full flex flex-col">
+        {/* Editor Column */}
+        <Card className="w-full lg:w-96 order-1 lg:order-2 h-full flex flex-col">
           <CardHeader>
             <CardTitle>Editor de Banner</CardTitle>
           </CardHeader>
@@ -248,7 +251,7 @@ export function BannerEditor() {
             <div>
               <Label>Preset</Label>
               <Select value={preset} onValueChange={(value) => {setPreset(value); updateScale()}}>
-                <SelectTrigger>
+                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un preset" />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,15 +279,17 @@ export function BannerEditor() {
               <Textarea value={text} onChange={(e) => setText(e.target.value)} />
             </div>
 
-            <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
-              {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-              Guardar
-            </Button>
+            <div className="pt-4 space-y-4">
+              <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+                Guardar
+              </Button>
 
-            <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
-              {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
-              Descargar
-            </Button>
+              <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
+                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
+                Descargar
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
