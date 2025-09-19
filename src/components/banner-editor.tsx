@@ -71,16 +71,28 @@ export function BannerEditor() {
 
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
-      const parentWidth = bannerWrapperRef.current.offsetWidth;
-      const scale = parentWidth / bannerDimensions.width;
-      setScale(Math.min(1, scale)); // No escalar más grande que 1
+      const container = bannerWrapperRef.current;
+      const padding = 32; // Corresponds to p-4, so 1rem * 2 = 32px
+      const availableWidth = container.offsetWidth - padding;
+      const availableHeight = container.offsetHeight - padding;
+
+      const widthScale = availableWidth / bannerDimensions.width;
+      const heightScale = availableHeight / bannerDimensions.height;
+      
+      const newScale = Math.min(widthScale, heightScale, 1);
+      setScale(newScale);
     }
   }, [bannerDimensions]);
 
+
   useEffect(() => {
-    updateScale();
+    // A small delay to ensure the container has its final dimensions
+    const timeoutId = setTimeout(updateScale, 50);
     window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      clearTimeout(timeoutId);
+    };
   }, [updateScale]);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
@@ -155,55 +167,49 @@ export function BannerEditor() {
     <div className="container mx-auto py-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        <div className="md:col-span-2 order-2 md:order-1">
-          <Card>
-            <CardContent className="p-4 md:p-6 flex justify-center items-center bg-muted/30">
-              <div 
-                ref={bannerWrapperRef}
-                className="w-full"
-              >
-                <div
-                  ref={bannerPreviewRef}
-                  className="relative overflow-hidden"
-                  style={{
-                    width: `${bannerDimensions.width}px`,
-                    height: `${bannerDimensions.height}px`,
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    backgroundImage: `url(${bannerImage})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                >
-                  {logoImage && (
-                    <Image
-                      src={logoImage}
-                      alt="Logo"
-                      width={logoSize * 10}
-                      height={logoSize * 10}
-                      style={{
-                        position: 'absolute',
-                        left: `${logoPosition.x}%`,
-                        top: `${logoPosition.y}%`,
-                        transform: 'translate(-50%, -50%)',
-                      }}
-                    />
-                  )}
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: `${textPosition.x}%`,
-                      top: `${textPosition.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                      fontSize: `${1 / scale}em` // Compensate text size
-                    }}
-                  >
-                    {text}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div 
+          ref={bannerWrapperRef}
+          className="md:col-span-2 order-2 md:order-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 min-h-[400px]"
+        >
+          <div
+            ref={bannerPreviewRef}
+            className="relative overflow-hidden shadow-lg"
+            style={{
+              width: `${bannerDimensions.width}px`,
+              height: `${bannerDimensions.height}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'center center',
+              backgroundImage: `url(${bannerImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            {logoImage && (
+              <Image
+                src={logoImage}
+                alt="Logo"
+                width={logoSize * 10}
+                height={logoSize * 10}
+                style={{
+                  position: 'absolute',
+                  left: `${logoPosition.x}%`,
+                  top: `${logoPosition.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              />
+            )}
+            <span
+              style={{
+                position: 'absolute',
+                left: `${textPosition.x}%`,
+                top: `${textPosition.y}%`,
+                transform: 'translate(-50%, -50%)',
+                fontSize: `${1 / scale}em` // Compensate text size
+              }}
+            >
+              {text}
+            </span>
+          </div>
         </div>
         
         <Card className="md:col-span-1 order-1 md:order-2 h-fit md:sticky md:top-24">
