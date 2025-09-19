@@ -13,9 +13,8 @@ import {
   signOut as firebaseSignOut,
   User,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useRouter, usePathname } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -34,8 +33,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is signed in, see if they exist in Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          // If user doc doesn't exist, create it.
+          // This handles both new sign-ups and first-time Google sign-ins.
+          try {
+            await setDoc(userDocRef, {
+              email: user.email,
+              displayName: user.displayName || '',
+              photoURL: user.photoURL || '',
+              createdAt: new Date(),
+              lastLogin: new Date(),
+            });
+          } catch (error) {
+            console.error("Error creating user document in Firestore:", error);
+          }
+        } else {
+          // If user exists, just update last login time.
+          try {
+            await setDoc(userDocRef, { lastLogin: new Date() }, { merge: true });
+          } catch (error) {
+            console.error("Error updating last login in Firestore:", error);
+          }
+        }
+        setUser(user);
+      } else {
+        // User is signed out
+        setUser(null);
+      }
       setLoading(false);
     });
 

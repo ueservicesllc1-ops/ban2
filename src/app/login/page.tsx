@@ -28,8 +28,7 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthLayout } from '@/hooks/use-auth';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, setDoc } from "firebase/firestore";
+import { auth } from '@/lib/firebase';
 import { Icons } from '@/components/icons';
 import { Separator } from '@/components/ui/separator';
 
@@ -77,14 +76,8 @@ export default function LoginPage() {
     setIsGoogleLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      const user = userCredential.user;
-       await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        displayName: user.displayName || '',
-        photoURL: user.photoURL || '',
-        lastLogin: new Date(),
-      }, { merge: true });
+      await signInWithPopup(auth, provider);
+      
       toast({
         title: 'Login Successful',
         description: 'Welcome!',
