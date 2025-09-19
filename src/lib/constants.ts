@@ -14,4 +14,9 @@ export const FONT_OPTIONS = [
   { label: 'Montserrat', value: 'Montserrat', isHeadline: true },
   { label: 'Lora', value: 'Lora', isHeadline: false },
   { label: 'Playfair Display', value: 'Playfair Display', isHeadline: true },
+  { label: 'Oswald', value: 'Oswald', isHeadline: true },
+  { label: 'Lato', value: 'Lato', isHeadline: false },
+  { label: 'Merriweather', value: 'Merriweather', isHeadline: false },
+  { label: 'Dancing Script', value: 'Dancing Script', isHeadline: true },
+  { label: 'Anton', value: 'Anton', isHeadline: true },
 ];
