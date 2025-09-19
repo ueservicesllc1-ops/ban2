@@ -253,18 +253,18 @@ export function BannerEditor() {
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="flex h-dvh w-full overflow-hidden">
       <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
-        <CardHeader>
+        <CardHeader className="py-4">
           <CardTitle>Editor de Banner</CardTitle>
         </CardHeader>
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full">
-            <CardContent className="space-y-4 pb-16">
+            <CardContent className="space-y-2 pb-4">
               <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
                 <AccordionItem value="item-1">
-                  <AccordionTrigger className="font-semibold">Configuración General</AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
+                  <AccordionTrigger className="font-semibold py-3">Configuración General</AccordionTrigger>
+                  <AccordionContent className="space-y-3 pt-2">
                     <div>
                       <Label>Preset</Label>
                       <Select value={preset} onValueChange={(value) => setPreset(value)}>
@@ -289,15 +289,15 @@ export function BannerEditor() {
                 </AccordionItem>
 
                 <AccordionItem value="item-2">
-                  <AccordionTrigger className="font-semibold">Logo</AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
+                  <AccordionTrigger className="font-semibold py-3">Logo</AccordionTrigger>
+                  <AccordionContent className="space-y-3 pt-2">
                     <div>
                       <Label>Imagen del Logo</Label>
                       <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
                     </div>
 
                     {logoImage && (
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         <Label>Tamaño del Logo ({logoSize}%)</Label>
                         <Slider
                           value={[logoSize]}
@@ -312,8 +312,8 @@ export function BannerEditor() {
                 </AccordionItem>
                 
                 <AccordionItem value="item-3">
-                  <AccordionTrigger className="font-semibold">Texto</AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
+                  <AccordionTrigger className="font-semibold py-3">Texto</AccordionTrigger>
+                  <AccordionContent className="space-y-3 pt-2">
                     <div>
                       <Label>Contenido del Texto</Label>
                       <Textarea value={text} onChange={(e) => setText(e.target.value)} />
@@ -331,11 +331,11 @@ export function BannerEditor() {
                           </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label>Tamaño ({textStyle.size}px)</Label>
                       <Slider value={[textStyle.size]} onValueChange={v => setTextStyle(s => ({ ...s, size: v[0] }))} max={200} min={10} step={1} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label>Color</Label>
                       <div className="flex items-center gap-2">
                         <Input type="color" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="p-1 h-10 w-16"/>
@@ -346,23 +346,23 @@ export function BannerEditor() {
                     <Accordion type="multiple" className="w-full">
                        <AccordionItem value="text-effects-shadow">
                           <AccordionTrigger className="text-sm py-2">Sombra</AccordionTrigger>
-                          <AccordionContent className="space-y-4 pt-2">
+                          <AccordionContent className="space-y-2 pt-2">
                             <div className="flex items-center justify-between"><Label>Activar Sombra</Label><Switch checked={textEffects.shadow.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, shadow: {...e.shadow, enabled: c}}))} /></div>
                             {textEffects.shadow.enabled && <>
-                              <div className="space-y-2"><Label>Offset X ({textEffects.shadow.offsetX}px)</Label><Slider value={[textEffects.shadow.offsetX]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetX: v[0]}}))} min={-20} max={20} step={1} /></div>
-                              <div className="space-y-2"><Label>Offset Y ({textEffects.shadow.offsetY}px)</Label><Slider value={[textEffects.shadow.offsetY]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetY: v[0]}}))} min={-20} max={20} step={1} /></div>
-                              <div className="space-y-2"><Label>Desenfoque ({textEffects.shadow.blur}px)</Label><Slider value={[textEffects.shadow.blur]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, blur: v[0]}}))} min={0} max={40} step={1} /></div>
-                              <div className="space-y-2"><Label>Color Sombra</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} /></div></div>
+                              <div className="space-y-1"><Label>Offset X ({textEffects.shadow.offsetX}px)</Label><Slider value={[textEffects.shadow.offsetX]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetX: v[0]}}))} min={-20} max={20} step={1} /></div>
+                              <div className="space-y-1"><Label>Offset Y ({textEffects.shadow.offsetY}px)</Label><Slider value={[textEffects.shadow.offsetY]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetY: v[0]}}))} min={-20} max={20} step={1} /></div>
+                              <div className="space-y-1"><Label>Desenfoque ({textEffects.shadow.blur}px)</Label><Slider value={[textEffects.shadow.blur]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, blur: v[0]}}))} min={0} max={40} step={1} /></div>
+                              <div className="space-y-1"><Label>Color Sombra</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} /></div></div>
                             </>}
                           </AccordionContent>
                        </AccordionItem>
                        <AccordionItem value="text-effects-stroke">
                           <AccordionTrigger className="text-sm py-2">Borde</AccordionTrigger>
-                          <AccordionContent className="space-y-4 pt-2">
+                          <AccordionContent className="space-y-2 pt-2">
                              <div className="flex items-center justify-between"><Label>Activar Borde</Label><Switch checked={textEffects.stroke.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, stroke: {...e.stroke, enabled: c}}))} /></div>
                               {textEffects.stroke.enabled && <>
-                                <div className="space-y-2"><Label>Grosor ({textEffects.stroke.width}px)</Label><Slider value={[textEffects.stroke.width]} onValueChange={v => setTextEffects(e => ({ ...e, stroke: {...e.stroke, width: v[0]}}))} min={0.5} max={10} step={0.5} /></div>
-                                <div className="space-y-2"><Label>Color Borde</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} /></div></div>
+                                <div className="space-y-1"><Label>Grosor ({textEffects.stroke.width}px)</Label><Slider value={[textEffects.stroke.width]} onValueChange={v => setTextEffects(e => ({ ...e, stroke: {...e.stroke, width: v[0]}}))} min={0.5} max={10} step={0.5} /></div>
+                                <div className="space-y-1"><Label>Color Borde</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} /></div></div>
                               </>}
                           </AccordionContent>
                        </AccordionItem>
@@ -371,7 +371,7 @@ export function BannerEditor() {
                 </AccordionItem>
               </Accordion>
               
-              <div className="pt-4 space-y-4 px-6">
+              <div className="pt-2 space-y-2 px-6">
                 <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
                   {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
                   Guardar
@@ -411,8 +411,8 @@ export function BannerEditor() {
               />
           ) : (
               <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
-                  <h3 className="text-2xl font-bold font-headline">{bannerDimensions.name}</h3>
-                  <p className="text-muted-foreground">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
+                  <h3 className="text-xl font-bold font-headline">{bannerDimensions.name}</h3>
+                  <p className="text-muted-foreground text-sm">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
               </div>
           )}
           
@@ -471,3 +471,5 @@ export function BannerEditor() {
     </div>
   );
 }
+
+    
