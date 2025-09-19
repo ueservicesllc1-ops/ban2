@@ -76,7 +76,7 @@ export function BannerEditor() {
   const updateScale = useCallback(() => {
     if (bannerWrapperRef.current && bannerDimensions) {
       const container = bannerWrapperRef.current;
-      const padding = 32; // p-4 on container
+      const padding = 32; // Corresponds to p-4
       const availableWidth = container.clientWidth - padding;
       const availableHeight = container.clientHeight - padding;
       
@@ -91,8 +91,12 @@ export function BannerEditor() {
 
   useEffect(() => {
     updateScale();
+    const debouncedUpdateScale = setTimeout(updateScale, 100); // Debounce for resize
     window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      clearTimeout(debouncedUpdateScale);
+    }
   }, [updateScale]);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
@@ -169,9 +173,9 @@ export function BannerEditor() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[384px_1fr] h-[calc(100vh-65px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-65px)] w-full overflow-hidden">
       {/* Editor Column */}
-      <Card className="rounded-none border-0 border-r flex flex-col">
+      <Card className="rounded-none border-0 border-r flex flex-col w-full lg:w-96 shrink-0 h-full">
         <CardHeader>
           <CardTitle>Editor de Banner</CardTitle>
         </CardHeader>
@@ -226,7 +230,7 @@ export function BannerEditor() {
       {/* Preview Column */}
       <div 
         ref={bannerWrapperRef}
-        className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0"
+        className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0 overflow-hidden"
       >
         <div
           ref={bannerPreviewRef}
@@ -256,7 +260,7 @@ export function BannerEditor() {
             <div
               className="absolute"
               style={{
-                  top: `${textPosition.y}%`,
+                  top: `${logoPosition.y}%`,
                   left: `${logoPosition.x}%`,
                   width: `${logoSize}%`,
                   transform: 'translate(-50%, -50%)',
