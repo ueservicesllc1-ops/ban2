@@ -6,9 +6,9 @@ import { withAuth } from '@/components/with-auth';
 
 function HomePage() {
   return (
-    <div className="flex flex-col min-h-dvh bg-background overflow-hidden">
+    <div className="flex flex-col h-dvh bg-background overflow-hidden">
       <Header />
-      <main className="flex-1">
+      <main className="flex-1 min-h-0">
         <BannerEditor />
       </main>
     </div>

@@ -252,12 +252,12 @@ export function BannerEditor() {
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden">
-      <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-dvh flex flex-col">
+    <div className="flex h-full w-full overflow-hidden">
+      <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
         <CardHeader className="py-2 border-b">
           <CardTitle className="text-xl">Editor de Banner</CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 space-y-1 p-2">
+        <CardContent className="flex-1 space-y-1 p-2 overflow-y-auto">
           <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
             <AccordionItem value="item-1">
               <AccordionTrigger className="font-semibold py-1 text-base">Configuración</AccordionTrigger>
