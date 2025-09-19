@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams, useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import { BANNER_PRESETS, FONT_OPTIONS } from '@/lib/constants';
+import { BANNER_PRESETS, FONT_OPTIONS, BLEND_MODES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -42,6 +42,13 @@ const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
   medium: { name: 'Mediano', width: 1080 },
   large: { name: 'Grande', width: 1920 },
 };
+
+const defaultColorFilter = {
+  enabled: false,
+  color: '#8A2BE2',
+  opacity: 0.5,
+  blendMode: 'overlay',
+}
 
 export function BannerEditor() {
   const { toast } = useToast();
@@ -67,6 +74,7 @@ export function BannerEditor() {
     shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 },
     stroke: { enabled: false, color: '#000000', width: 1 },
   });
+  const [colorFilter, setColorFilter] = useState(defaultColorFilter);
   
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -109,6 +117,7 @@ export function BannerEditor() {
             setTextPosition(data.textPosition || { x: 50, y: 50 });
             setTextStyle(data.textStyle || { font: 'Poppins', size: 48, color: '#FFFFFF' });
             setTextEffects(data.textEffects || { shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 }, stroke: { enabled: false, color: '#000000', width: 1 } });
+            setColorFilter(data.colorFilter || defaultColorFilter);
           } else {
             toast({ variant: 'destructive', title: 'Error', description: 'No se encontró el banner para editar.'});
             router.replace('/');
@@ -175,7 +184,7 @@ export function BannerEditor() {
 
     setIsSaving(true);
     try {
-      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, textStyle, textEffects, preset, customDimensions, userId: user.uid };
+      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, textStyle, textEffects, preset, customDimensions, colorFilter, userId: user.uid };
       if (bannerId) {
         const docRef = doc(db, 'users', user.uid, 'banners', bannerId);
         await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
@@ -218,6 +227,13 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
 
     try {
         const bannerNode = bannerPreviewRef.current;
+
+        // Temporarily set the background color of the node if there is no banner image to avoid transparency
+        const originalBackgroundColor = bannerNode.style.backgroundColor;
+        if (!bannerImage) {
+            bannerNode.style.backgroundColor = 'white';
+        }
+
         const rect = bannerNode.getBoundingClientRect();
         const targetWidth = DOWNLOAD_SIZES[size].width;
         const scale = targetWidth / rect.width;
@@ -225,7 +241,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
         const fontEmbedCSS = await getFontEmbedCSS();
 
         const options = {
-            backgroundColor: '#ffffff',
             pixelRatio: 2,
             width: targetWidth,
             height: targetHeight,
@@ -236,14 +251,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 height: `${rect.height}px`,
             },
             fontEmbedCSS: fontEmbedCSS,
-             // Agregamos un filtro para excluir imágenes problemáticas si es necesario
-             filter: (node: HTMLElement) => {
-              // Ejemplo: si las imágenes de placeholder causan problemas
-              if (node.tagName === 'IMG' && node.src.includes('picsum.photos')) {
-                return false;
-              }
-              return true;
-            },
         };
 
         const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
@@ -265,18 +272,21 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             link.download = fileName;
             link.click();
         }
+        
+        // Restore original background color
+        bannerNode.style.backgroundColor = originalBackgroundColor;
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
         toast({
           variant: 'destructive',
           title: 'Error al Descargar',
-          description: 'No se pudo generar el archivo. Por favor, inténtalo de nuevo.',
+          description: `No se pudo generar el archivo. ${error instanceof Error ? error.message : ''}`,
         });
     } finally {
         setIsDownloading(false);
     }
-}, [text, toast]);
+}, [text, toast, bannerImage]);
 
   const handleAiSuggestions = async () => {
     if (!bannerImage || !logoImage) {
@@ -463,6 +473,36 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 </AccordionContent>
               </AccordionItem>
 
+              <AccordionItem value="item-filter">
+                <AccordionTrigger className="font-semibold py-1 text-base">Filtro de Color</AccordionTrigger>
+                <AccordionContent className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Filtro</Label><Switch checked={colorFilter.enabled} onCheckedChange={c => setColorFilter(f => ({ ...f, enabled: c}))} /></div>
+                  {colorFilter.enabled && <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Color del Filtro</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="color" value={colorFilter.color} onChange={e => setColorFilter(f => ({ ...f, color: e.target.value }))} className="p-1 h-8 w-10"/>
+                        <Input type="text" value={colorFilter.color} onChange={e => setColorFilter(f => ({ ...f, color: e.target.value }))} className="h-8 text-xs"/>
+                      </div>
+                    </div>
+                    <div className="space-y-1"><Label className="text-xs">Opacidad ({Math.round(colorFilter.opacity * 100)}%)</Label><Slider value={[colorFilter.opacity]} onValueChange={v => setColorFilter(f => ({ ...f, opacity: v[0]}))} min={0} max={1} step={0.01} /></div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Modo de Fusión</Label>
+                      <Select value={colorFilter.blendMode} onValueChange={(mode) => setColorFilter(f => ({ ...f, blendMode: mode }))}>
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                              {BLEND_MODES.map(mode => (
+                                  <SelectItem key={mode.value} value={mode.value} className="text-xs">
+                                      {mode.label}
+                                  </SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                    </div>
+                  </>}
+                </AccordionContent>
+              </AccordionItem>
+              
               <AccordionItem value="item-2">
                 <AccordionTrigger className="font-semibold py-1 text-base">Logo</AccordionTrigger>
                 <AccordionContent className="space-y-1 pt-1">
@@ -608,6 +648,17 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 </div>
             )}
             
+            {colorFilter.enabled && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor: colorFilter.color,
+                  opacity: colorFilter.opacity,
+                  mixBlendMode: colorFilter.blendMode as React.CSSProperties['mixBlendMode'],
+                }}
+              />
+            )}
+
             {logoImage && (
               <div
                 className={cn("absolute cursor-move group", { 'cursor-grabbing': isDraggingLogo })}

@@ -44,6 +44,12 @@ export interface BannerData extends DocumentData {
   };
   preset?: string;
   customDimensions?: { width: number; height: number; };
+  colorFilter?: {
+    enabled: boolean;
+    color: string;
+    opacity: number;
+    blendMode: string;
+  };
 }
 
 function PortfolioPage() {

@@ -71,6 +71,13 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
 
     try {
         const bannerNode = previewRef.current;
+        
+        // Temporarily set the background color of the node if there is no banner image to avoid transparency
+        const originalBackgroundColor = bannerNode.style.backgroundColor;
+        if (!banner.bannerImage) {
+            bannerNode.style.backgroundColor = 'white';
+        }
+
         const rect = bannerNode.getBoundingClientRect();
         const targetWidth = DOWNLOAD_SIZES[size].width;
         const scale = targetWidth / rect.width;
@@ -78,7 +85,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
         const fontEmbedCSS = await getFontEmbedCSS();
 
         const options = {
-            backgroundColor: '#ffffff',
             pixelRatio: 2,
             width: targetWidth,
             height: targetHeight,
@@ -89,14 +95,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 height: `${rect.height}px`,
             },
             fontEmbedCSS: fontEmbedCSS,
-            // Agregamos un filtro para excluir imágenes problemáticas si es necesario
-            filter: (node: HTMLElement) => {
-              // Ejemplo: si las imágenes de placeholder causan problemas
-              if (node.tagName === 'IMG' && node.src.includes('picsum.photos')) {
-                return false;
-              }
-              return true;
-            },
         };
 
         const fileName = `${(banner.text || 'banner').substring(0, 20)}-${size}.${format}`;
@@ -118,20 +116,23 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             link.download = fileName;
             link.click();
         }
+        
+        // Restore original background color
+        bannerNode.style.backgroundColor = originalBackgroundColor;
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
         toast({
           variant: 'destructive',
           title: 'Error al Descargar',
-          description: 'No se pudo generar el archivo. Por favor, inténtalo de nuevo.',
+          description: `No se pudo generar el archivo. ${error instanceof Error ? error.message : ''}`,
         });
     } finally {
         setIsDownloading(false);
     }
-  }, [banner.text, toast]);
+  }, [banner, toast]);
 
-  const { textStyle, textEffects, preset, customDimensions } = banner;
+  const { textStyle, textEffects, preset, customDimensions, colorFilter } = banner;
   const bannerDimensions = preset === 'custom' ? customDimensions : (preset && BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS]) || { width: 851, height: 315 };
   
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle?.font)?.isHeadline ? 'font-headline' : 'font-body';
@@ -151,7 +152,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
           <div
               ref={previewRef}
               id={`preview-node-${banner.id}`}
-              className="relative overflow-hidden bg-muted/50"
+              className="relative overflow-hidden bg-background"
               style={{
                 width: `${bannerDimensions?.width}px`,
                 height: `${bannerDimensions?.height}px`,
@@ -159,6 +160,17 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             >
               {banner.bannerImage && (
                 <Image src={banner.bannerImage} alt="Banner background" layout="fill" objectFit="cover" unoptimized crossOrigin="anonymous"/>
+              )}
+
+              {colorFilter?.enabled && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: colorFilter.color,
+                    opacity: colorFilter.opacity,
+                    mixBlendMode: colorFilter.blendMode as React.CSSProperties['mixBlendMode'],
+                  }}
+                />
               )}
 
               {banner.logoImage && banner.logoPosition && (
