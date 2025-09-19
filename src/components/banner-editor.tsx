@@ -194,99 +194,66 @@ export function BannerEditor() {
     }
   };
   
-const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize = 'medium') => {
+const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize) => {
     if (!bannerPreviewRef.current) {
-      toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
-      return;
+        toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
+        return;
     }
     setIsDownloading(true);
 
-    const bannerNode = bannerPreviewRef.current;
-    const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
-
-    let clonedNode: HTMLElement | null = null;
     try {
-      const targetWidth = DOWNLOAD_SIZES[size].width;
+        const bannerNode = bannerPreviewRef.current;
+        const rect = bannerNode.getBoundingClientRect();
+        const targetWidth = DOWNLOAD_SIZES[size].width;
+        const scaleFactor = targetWidth / rect.width;
+        const targetHeight = rect.height * scaleFactor;
 
-      clonedNode = bannerNode.cloneNode(true) as HTMLElement;
-      clonedNode.style.position = 'absolute';
-      clonedNode.style.top = '-9999px';
-      clonedNode.style.left = '-9999px';
-      
-      const originalWidth = bannerNode.offsetWidth;
-      const originalHeight = bannerNode.offsetHeight;
-      const aspectRatio = originalWidth / originalHeight;
-      const targetHeight = targetWidth / aspectRatio;
+        const options = {
+            backgroundColor: '#ffffff',
+            pixelRatio: 2,
+            width: targetWidth,
+            height: targetHeight,
+            style: {
+                transform: `scale(${scaleFactor})`,
+                transformOrigin: 'top left',
+                width: `${rect.width}px`,
+                height: `${rect.height}px`,
+            },
+        };
 
-      clonedNode.style.width = `${targetWidth}px`;
-      clonedNode.style.height = `${targetHeight}px`;
+        const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
+        let dataUrl: string;
 
-      document.body.appendChild(clonedNode);
-      
-      // Embed images as data URIs to prevent blank images
-      const images = Array.from(clonedNode.getElementsByTagName('img'));
-      for (const img of images) {
-          if (img.src && img.src.startsWith('http')) {
-              try {
-                  const response = await fetch(img.src);
-                  const blob = await response.blob();
-                  const dataUrl = await new Promise<string>((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.onloadend = () => resolve(reader.result as string);
-                      reader.onerror = reject;
-                      reader.readAsDataURL(blob);
-                  });
-                  img.src = dataUrl;
-                  img.crossOrigin = 'anonymous'; // Ensure it's treated correctly
-              } catch (e) {
-                  console.warn(`Could not embed image: ${img.src}`, e);
-              }
-          }
-      }
+        if (format === 'pdf') {
+            const imgData = await htmlToImage.toPng(bannerNode, options);
+            const pdf = new jsPDF({
+                orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [targetWidth, targetHeight],
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, targetWidth, targetHeight);
+            pdf.save(fileName);
+        } else {
+            const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
+            dataUrl = await generator(bannerNode, { ...options, quality: 0.95 });
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = fileName;
+            link.click();
+        }
 
-      const options = {
-          width: targetWidth,
-          height: targetHeight,
-          pixelRatio: 2,
-          backgroundColor: '#ffffff',
-          style: {
-            // We are sizing the node itself, so we don't need transform here
-          }
-      };
-
-      if (format === 'pdf') {
-        const jpegData = await htmlToImage.toJpeg(clonedNode, { ...options, quality: 0.95 });
-        const doc = new jsPDF({
-          orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
-          unit: 'px',
-          format: [targetWidth, targetHeight],
-        });
-        doc.addImage(jpegData, 'JPEG', 0, 0, targetWidth, targetHeight);
-        doc.save(fileName);
-      } else {
-        const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-        const dataUrl = await generator(clonedNode, options);
-        const link = document.createElement('a');
-        link.download = fileName;
-        link.href = dataUrl;
-        link.click();
-      }
-
-      toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
+        toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
-      console.error('Error en la descarga:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error de Descarga',
-        description: 'Ocurrió un error al generar tu archivo.',
-      });
+        console.error('Error en la descarga:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error de Descarga',
+            description: 'Ocurrió un error al generar tu archivo.',
+        });
     } finally {
-      if (clonedNode) {
-        document.body.removeChild(clonedNode);
-      }
-      setIsDownloading(false);
+        setIsDownloading(false);
     }
-  }, [text, toast]);
+}, [text, toast]);
 
   const handleAiSuggestions = async () => {
     if (!bannerImage || !logoImage) {
