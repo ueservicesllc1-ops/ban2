@@ -21,6 +21,7 @@ import jsPDF from 'jspdf';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { FONT_OPTIONS } from "@/lib/constants";
+import { Button } from "@/components/ui/button";
 
 interface BannerActionsProps {
   banner: BannerData;
