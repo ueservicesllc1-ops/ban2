@@ -36,7 +36,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/use-auth';
 import { Switch } from '@/components/ui/switch';
 import * as htmlToImage from 'html-to-image';
-import { getWebFontCSS } from 'html-to-image/es/embed-webfonts';
 import jsPDF from 'jspdf';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { BannerData } from '@/app/portfolio/page';
@@ -325,7 +324,8 @@ export function BannerEditor() {
   };
 
   const handleDownload = async () => {
-    if (!bannerPreviewRef.current) {
+    const element = bannerPreviewRef.current;
+    if (!element) {
       toast({
         variant: 'destructive',
         title: 'Falló la descarga',
@@ -338,23 +338,25 @@ export function BannerEditor() {
     const { scale } = DOWNLOAD_SIZES[downloadOptions.size as keyof typeof DOWNLOAD_SIZES];
     const { width, height } = bannerDimensions;
     const format = downloadOptions.format;
-    const element = bannerPreviewRef.current;
 
     try {
-        const fontCSS = await getWebFontCSS(element, {
+        const fontFamilies = FONT_OPTIONS.map(f => f.value);
+        const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
+            fontFamilies,
             fetchRequestInit: {
                 mode: 'cors',
                 credentials: 'omit',
-            },
+            }
         });
+
         const options = {
+            width: width,
+            height: height,
             canvasWidth: width * scale,
             canvasHeight: height * scale,
             style: {
               transform: `scale(${scale})`,
               transformOrigin: 'top left',
-              width: `${width}px`,
-              height: `${height}px`,
             },
             pixelRatio: 1,
             fetchRequestInit: {
@@ -362,8 +364,10 @@ export function BannerEditor() {
               credentials: 'omit' as RequestCredentials,
             },
             fontEmbedCSS: fontCSS,
+            filter: (node: HTMLElement) => {
+              return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
+            }
         };
-
       let dataUrl;
       
       const fileName = `${text.substring(0,20) || 'banner'}.${format}`;
@@ -452,7 +456,7 @@ export function BannerEditor() {
       textShadow: textEffects.shadow.enabled
         ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
         : 'none',
-  };
+  }
 
   return (
     <div className="container mx-auto py-8">
@@ -659,7 +663,7 @@ export function BannerEditor() {
                            <Select value={downloadOptions.size} onValueChange={val => setDownloadOptions(o => ({ ...o, size: val }))}>
                               <SelectTrigger id="download-size">
                                 <SelectValue />
-                              </SelectTrigger>
+                              </Trigger>
                               <SelectContent>
                                 {Object.entries(DOWNLOAD_SIZES).map(([key, value]) => (
                                   <SelectItem key={key} value={key}>{value.name}</SelectItem>

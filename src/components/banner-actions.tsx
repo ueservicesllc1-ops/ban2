@@ -17,7 +17,6 @@ import { Download, Edit, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import * as htmlToImage from 'html-to-image';
-import { getWebFontCSS } from 'html-to-image/es/embed-webfonts';
 import jsPDF from 'jspdf';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -60,21 +59,23 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     const fileName = `${banner.text?.substring(0, 20) || 'banner'}.${format}`;
 
     try {
-        const fontCSS = await getWebFontCSS(element, {
+        const fontFamilies = FONT_OPTIONS.map(f => f.value);
+        const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
+            fontFamilies,
             fetchRequestInit: {
                 mode: 'cors',
                 credentials: 'omit',
-            },
+            }
         });
 
         const options = {
+            width: width,
+            height: height,
             canvasWidth: width * scale,
             canvasHeight: height * scale,
             style: {
               transform: `scale(${scale})`,
               transformOrigin: 'top left',
-              width: `${width}px`,
-              height: `${height}px`,
             },
             pixelRatio: 1,
             fetchRequestInit: {
@@ -82,6 +83,11 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
               credentials: 'omit' as RequestCredentials,
             },
             fontEmbedCSS: fontCSS,
+            // The library fails to capture images from Firebase storage unless we provide this.
+            // It's a known issue with CORS and external images.
+            filter: (node: HTMLElement) => {
+              return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
+            }
         };
 
       let dataUrl;
