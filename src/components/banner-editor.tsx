@@ -220,31 +220,23 @@ export function BannerEditor() {
               width: `${width}px`,
               height: `${height}px`
             },
-            pixelRatio: 1, // We are handling scaling manually
+            pixelRatio: 1,
             fetchRequestInit: {
                 mode: 'cors',
                 credentials: 'omit',
             },
-            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', // Transparent 1x1 pixel
-            filter: (node: HTMLElement) => {
-                if (node.tagName === 'IMG' && node.hasAttribute('src')) {
-                    // Prevent html-to-image from re-fetching images, we will handle them
-                    return true;
-                }
-                return true;
-            },
+            imagePlaceholder: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
         };
 
         const generateAndDownload = async (generator: (node: HTMLElement, options?: any) => Promise<string>, options: any, ext: 'png' | 'jpeg') => {
             const tempNode = bannerPreviewRef.current!.cloneNode(true) as HTMLElement;
             tempNode.prepend(styleEl);
 
-            // Handle images manually
             const images = Array.from(tempNode.getElementsByTagName('img'));
             for(const img of images){
-                if(img.src.startsWith('http')) { // Only handle external images
+                if(img.src.startsWith('http')) {
                     try {
-                        const response = await fetch(img.src, { mode: 'cors' });
+                        const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
                         const blob = await response.blob();
                         const dataUrl = await new Promise<string>(resolve => {
                             const reader = new FileReader();
@@ -280,7 +272,6 @@ export function BannerEditor() {
         } else if (format === 'jpg') {
             await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
         } else if (format === 'pdf') {
-            // PDF generation will use JPEG for better compression
             await generateAndDownload(htmlToImage.toJpeg, { ...dataUrlOptions, quality: 0.95 }, 'jpeg');
         }
 
