@@ -27,7 +27,8 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AuthLayout } from '@/hooks/use-auth';
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { Icons } from '@/components/icons';
 
 const formSchema = z.object({
@@ -53,7 +54,12 @@ export default function SignupPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        createdAt: new Date(),
+      });
       toast({
         title: 'Account Created',
         description: "You have been successfully signed up!",
@@ -74,7 +80,14 @@ export default function SignupPage() {
     setIsGoogleLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        createdAt: new Date(),
+      }, { merge: true }); // Use merge to avoid overwriting data if user already exists
       toast({
         title: 'Account Created',
         description: 'You have been successfully signed up with Google!',
