@@ -81,8 +81,8 @@ export default function LoginPage() {
       const user = userCredential.user;
        await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
         lastLogin: new Date(),
       }, { merge: true });
       toast({
