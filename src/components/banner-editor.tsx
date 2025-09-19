@@ -171,10 +171,61 @@ export function BannerEditor() {
     <div className="container mx-auto py-8 h-[calc(100vh-8rem)]">
       <div className="flex flex-col lg:flex-row gap-8 h-full">
         
+        {/* Editor Column */}
+        <Card className="w-full lg:w-96 order-1 lg:order-1 h-full flex flex-col">
+          <CardHeader>
+            <CardTitle>Editor de Banner</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 flex-1 overflow-y-auto">
+            <div>
+              <Label>Preset</Label>
+              <Select value={preset} onValueChange={(value) => {setPreset(value); updateScale()}}>
+                 <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un preset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(BANNER_PRESETS).map((key) => (
+                    <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
+                  ))}
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Imagen de banner</Label>
+              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
+              {isUploading && <Loader2 className="animate-spin mt-2" />}
+            </div>
+
+            <div>
+              <Label>Logo</Label>
+              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
+            </div>
+
+            <div>
+              <Label>Texto</Label>
+              <Textarea value={text} onChange={(e) => setText(e.target.value)} />
+            </div>
+
+            <div className="pt-4 space-y-4">
+              <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+                Guardar
+              </Button>
+
+              <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
+                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
+                Descargar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Preview Column */}
         <div 
           ref={bannerWrapperRef}
-          className="flex-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative min-h-0 order-2 lg:order-1"
+          className="flex-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative min-h-0 order-2 lg:order-2"
         >
           <div
             ref={bannerPreviewRef}
@@ -243,57 +294,6 @@ export function BannerEditor() {
           </div>
         </div>
         
-        {/* Editor Column */}
-        <Card className="w-full lg:w-96 order-1 lg:order-2 h-full flex flex-col">
-          <CardHeader>
-            <CardTitle>Editor de Banner</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 flex-1 overflow-y-auto">
-            <div>
-              <Label>Preset</Label>
-              <Select value={preset} onValueChange={(value) => {setPreset(value); updateScale()}}>
-                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(BANNER_PRESETS).map((key) => (
-                    <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
-                  ))}
-                  <SelectItem value="custom">Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Imagen de banner</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
-              {isUploading && <Loader2 className="animate-spin mt-2" />}
-            </div>
-
-            <div>
-              <Label>Logo</Label>
-              <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
-            </div>
-
-            <div>
-              <Label>Texto</Label>
-              <Textarea value={text} onChange={(e) => setText(e.target.value)} />
-            </div>
-
-            <div className="pt-4 space-y-4">
-              <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
-                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                Guardar
-              </Button>
-
-              <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full">
-                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
-                Descargar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
       </div>
     </div>
   );
