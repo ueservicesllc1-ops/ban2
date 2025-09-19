@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback, ChangeEvent } from 'react';
@@ -223,8 +221,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
         };
 
         const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
-        let dataUrl: string;
-
+        
         if (format === 'pdf') {
             const imgData = await htmlToImage.toPng(banner, options);
             const pdf = new jsPDF({
@@ -236,7 +233,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             pdf.save(fileName);
         } else {
             const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-            dataUrl = await generator(banner, { ...options, quality: 0.95 });
+            const dataUrl = await generator(banner, { ...options, quality: 0.95 });
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = fileName;
@@ -245,7 +242,11 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
-        // Silently fail
+        toast({
+          variant: 'destructive',
+          title: 'Error al Descargar',
+          description: 'No se pudo generar el archivo. Por favor, inténtalo de nuevo.',
+        });
     } finally {
         setIsDownloading(false);
     }

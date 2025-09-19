@@ -1,4 +1,3 @@
-
 // src/components/banner-actions.tsx
 'use client'
 
@@ -48,7 +47,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     router.push(`/?edit=${banner.id}`);
   };
 
-  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize) => {
+const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize) => {
     if (!previewRef.current) {
         toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
         return;
@@ -59,8 +58,8 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         const bannerNode = previewRef.current;
         const rect = bannerNode.getBoundingClientRect();
         const targetWidth = DOWNLOAD_SIZES[size].width;
-        const scaleFactor = targetWidth / rect.width;
-        const targetHeight = rect.height * scaleFactor;
+        const scale = targetWidth / rect.width;
+        const targetHeight = rect.height * scale;
 
         const options = {
             backgroundColor: '#ffffff',
@@ -68,7 +67,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
             width: targetWidth,
             height: targetHeight,
             style: {
-                transform: `scale(${scaleFactor})`,
+                transform: `scale(${scale})`,
                 transformOrigin: 'top left',
                 width: `${rect.width}px`,
                 height: `${rect.height}px`,
@@ -76,7 +75,6 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         };
 
         const fileName = `${banner.text?.substring(0, 20) || 'banner'}-${size}.${format}`;
-        let dataUrl: string;
 
         if (format === 'pdf') {
             const imgData = await htmlToImage.toPng(bannerNode, options);
@@ -89,7 +87,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
             pdf.save(fileName);
         } else {
             const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-            dataUrl = await generator(bannerNode, { ...options, quality: 0.95 });
+            const dataUrl = await generator(bannerNode, { ...options, quality: 0.95 });
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = fileName;
@@ -98,7 +96,11 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
 
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
     } catch (error) {
-        // Silently fail
+        toast({
+          variant: 'destructive',
+          title: 'Error al Descargar',
+          description: 'No se pudo generar el archivo. Por favor, inténtalo de nuevo.',
+        });
     } finally {
         setIsDownloading(false);
     }
