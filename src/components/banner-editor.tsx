@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getPlacementSuggestions } from '@/app/actions';
 import { fileToDataUri } from '@/lib/utils';
+import { TemplateGallery } from './template-gallery';
+import type { Template } from '@/lib/templates';
 
 type DownloadSize = 'small' | 'medium' | 'large';
 const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
@@ -85,6 +87,26 @@ export function BannerEditor() {
     if (preset === 'custom') return customDimensions;
     return BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS] || BANNER_PRESETS.facebookCover;
   }, [preset, customDimensions]);
+
+  const loadTemplate = (template: Template) => {
+    setBannerImage(template.bannerImage);
+    setLogoImage(template.logoImage);
+    setText(template.text);
+    setPreset(template.preset);
+    if(template.preset === 'custom' && template.customDimensions) {
+      setCustomDimensions(template.customDimensions);
+    }
+    setLogoPosition(template.logoPosition);
+    setLogoSize(template.logoSize);
+    setTextPosition(template.textPosition);
+    setTextStyle(template.textStyle);
+    setTextEffects(template.textEffects);
+
+    toast({
+      title: 'Plantilla Cargada',
+      description: `Se ha cargado la plantilla "${template.name}".`,
+    })
+  };
 
    useEffect(() => {
     const editId = searchParams.get('edit');
@@ -419,246 +441,250 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-       <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
-        <CardHeader className="py-2 border-b">
-          <CardTitle className="text-xl">Editor de Banner</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 space-y-1 p-2 overflow-y-auto">
-          <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
-            <AccordionItem value="item-1">
-              <AccordionTrigger className="font-semibold py-1 text-base">Configuración</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-xs">Preset</Label>
-                  <Select value={preset} onValueChange={(value) => setPreset(value)}>
-                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(BANNER_PRESETS).map((key) => (
-                        <SelectItem key={key} value={key} className="text-xs">{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
-                      ))}
-                      <SelectItem value="custom" className="text-xs">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {preset === 'custom' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Ancho (px)</Label>
-                      <Input type="number" value={customDimensions.width} onChange={e => setCustomDimensions(d => ({...d, width: parseInt(e.target.value)}))} className="h-8 text-xs" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Alto (px)</Label>
-                      <Input type="number" value={customDimensions.height} onChange={e => setCustomDimensions(d => ({...d, height: parseInt(e.target.value)}))} className="h-8 text-xs" />
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <Label className="text-xs">Imagen de banner</Label>
-                  <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading} className="h-8 text-xs"/>
-                  {isUploading && <Loader2 className="animate-spin mt-1" />}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-2">
-              <AccordionTrigger className="font-semibold py-1 text-base">Logo</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-xs">Imagen del Logo</Label>
-                  <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading} className="h-8 text-xs"/>
-                </div>
-
-                {logoImage && (
+    <div className="flex flex-col h-full w-full overflow-hidden">
+      <div className="flex-1 flex min-h-0">
+        <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
+          <CardHeader className="py-2 border-b">
+            <CardTitle className="text-xl">Editor de Banner</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 space-y-1 p-2 overflow-y-auto">
+            <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger className="font-semibold py-1 text-base">Configuración</AccordionTrigger>
+                <AccordionContent className="space-y-1 pt-1">
                   <div className="space-y-1">
-                    <Label className="text-xs">Tamaño ({logoSize}%)</Label>
-                    <Slider value={[logoSize]} onValueChange={(value) => setLogoSize(value[0])} max={50} min={5} step={1} />
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-            
-            <AccordionItem value="item-3">
-              <AccordionTrigger className="font-semibold py-1 text-base">Texto</AccordionTrigger>
-              <AccordionContent className="space-y-1 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-xs">Contenido</Label>
-                  <Textarea value={text} onChange={(e) => setText(e.target.value)} className="text-xs min-h-[60px]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tipografía</Label>
-                  <Select value={textStyle.font} onValueChange={(font) => setTextStyle(s => ({ ...s, font }))}>
+                    <Label className="text-xs">Preset</Label>
+                    <Select value={preset} onValueChange={(value) => setPreset(value)}>
                       <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                          {FONT_OPTIONS.map(font => (
-                              <SelectItem key={font.value} value={font.value} style={{fontFamily: `'${font.value}', sans-serif`}} className="text-xs">
-                                  {font.label}
-                              </SelectItem>
-                          ))}
+                        {Object.keys(BANNER_PRESETS).map((key) => (
+                          <SelectItem key={key} value={key} className="text-xs">{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
+                        ))}
+                        <SelectItem value="custom" className="text-xs">Personalizado</SelectItem>
                       </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tamaño ({textStyle.size}px)</Label>
-                  <Slider value={[textStyle.size]} onValueChange={v => setTextStyle(s => ({ ...s, size: v[0] }))} max={200} min={10} step={1} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Color</Label>
-                  <div className="flex items-center gap-2">
-                    <Input type="color" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="p-1 h-8 w-10"/>
-                    <Input type="text" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="h-8 text-xs"/>
+                    </Select>
                   </div>
-                </div>
-                
-                <Accordion type="multiple" className="w-full">
-                   <AccordionItem value="text-effects-shadow">
-                      <AccordionTrigger className="text-sm py-1">Sombra</AccordionTrigger>
-                      <AccordionContent className="space-y-1 pt-1">
-                        <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Sombra</Label><Switch checked={textEffects.shadow.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, shadow: {...e.shadow, enabled: c}}))} /></div>
-                        {textEffects.shadow.enabled && <>
-                          <div className="space-y-1"><Label className="text-xs">Offset X ({textEffects.shadow.offsetX}px)</Label><Slider value={[textEffects.shadow.offsetX]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetX: v[0]}}))} min={-20} max={20} step={1} /></div>
-                          <div className="space-y-1"><Label className="text-xs">Offset Y ({textEffects.shadow.offsetY}px)</Label><Slider value={[textEffects.shadow.offsetY]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetY: v[0]}}))} min={-20} max={20} step={1} /></div>
-                          <div className="space-y-1"><Label className="text-xs">Desenfoque ({textEffects.shadow.blur}px)</Label><Slider value={[textEffects.shadow.blur]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, blur: v[0]}}))} min={0} max={40} step={1} /></div>
-                          <div className="space-y-1"><Label className="text-xs">Color Sombra</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="p-1 h-8 w-10" /><Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="h-8 text-xs"/></div></div>
-                        </>}
-                      </AccordionContent>
-                   </AccordionItem>
-                   <AccordionItem value="text-effects-stroke">
-                      <AccordionTrigger className="text-sm py-1">Borde</AccordionTrigger>
-                      <AccordionContent className="space-y-1 pt-1">
-                         <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Borde</Label><Switch checked={textEffects.stroke.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, stroke: {...e.stroke, enabled: c}}))} /></div>
-                          {textEffects.stroke.enabled && <>
-                            <div className="space-y-1"><Label className="text-xs">Grosor ({textEffects.stroke.width}px)</Label><Slider value={[textEffects.stroke.width]} onValueChange={v => setTextEffects(e => ({ ...e, stroke: {...e.stroke, width: v[0]}}))} min={0.5} max={10} step={0.5} /></div>
-                            <div className="space-y-1"><Label className="text-xs">Color Borde</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="p-1 h-8 w-10" /><Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="h-8 text-xs"/></div></div>
+                  {preset === 'custom' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Ancho (px)</Label>
+                        <Input type="number" value={customDimensions.width} onChange={e => setCustomDimensions(d => ({...d, width: parseInt(e.target.value)}))} className="h-8 text-xs" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Alto (px)</Label>
+                        <Input type="number" value={customDimensions.height} onChange={e => setCustomDimensions(d => ({...d, height: parseInt(e.target.value)}))} className="h-8 text-xs" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Imagen de banner</Label>
+                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading} className="h-8 text-xs"/>
+                    {isUploading && <Loader2 className="animate-spin mt-1" />}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-2">
+                <AccordionTrigger className="font-semibold py-1 text-base">Logo</AccordionTrigger>
+                <AccordionContent className="space-y-1 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Imagen del Logo</Label>
+                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading} className="h-8 text-xs"/>
+                  </div>
+
+                  {logoImage && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tamaño ({logoSize}%)</Label>
+                      <Slider value={[logoSize]} onValueChange={(value) => setLogoSize(value[0])} max={50} min={5} step={1} />
+                    </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="item-3">
+                <AccordionTrigger className="font-semibold py-1 text-base">Texto</AccordionTrigger>
+                <AccordionContent className="space-y-1 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Contenido</Label>
+                    <Textarea value={text} onChange={(e) => setText(e.target.value)} className="text-xs min-h-[60px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipografía</Label>
+                    <Select value={textStyle.font} onValueChange={(font) => setTextStyle(s => ({ ...s, font }))}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            {FONT_OPTIONS.map(font => (
+                                <SelectItem key={font.value} value={font.value} style={{fontFamily: `'${font.value}', sans-serif`}} className="text-xs">
+                                    {font.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tamaño ({textStyle.size}px)</Label>
+                    <Slider value={[textStyle.size]} onValueChange={v => setTextStyle(s => ({ ...s, size: v[0] }))} max={200} min={10} step={1} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Color</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="color" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="p-1 h-8 w-10"/>
+                      <Input type="text" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="h-8 text-xs"/>
+                    </div>
+                  </div>
+                  
+                  <Accordion type="multiple" className="w-full">
+                    <AccordionItem value="text-effects-shadow">
+                        <AccordionTrigger className="text-sm py-1">Sombra</AccordionTrigger>
+                        <AccordionContent className="space-y-1 pt-1">
+                          <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Sombra</Label><Switch checked={textEffects.shadow.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, shadow: {...e.shadow, enabled: c}}))} /></div>
+                          {textEffects.shadow.enabled && <>
+                            <div className="space-y-1"><Label className="text-xs">Offset X ({textEffects.shadow.offsetX}px)</Label><Slider value={[textEffects.shadow.offsetX]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetX: v[0]}}))} min={-20} max={20} step={1} /></div>
+                            <div className="space-y-1"><Label className="text-xs">Offset Y ({textEffects.shadow.offsetY}px)</Label><Slider value={[textEffects.shadow.offsetY]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetY: v[0]}}))} min={-20} max={20} step={1} /></div>
+                            <div className="space-y-1"><Label className="text-xs">Desenfoque ({textEffects.shadow.blur}px)</Label><Slider value={[textEffects.shadow.blur]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, blur: v[0]}}))} min={0} max={40} step={1} /></div>
+                            <div className="space-y-1"><Label className="text-xs">Color Sombra</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="p-1 h-8 w-10" /><Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="h-8 text-xs"/></div></div>
                           </>}
-                      </AccordionContent>
-                   </AccordionItem>
-                </Accordion>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </CardContent>
-        <div className="p-2 space-y-2 border-t">
-          <Button onClick={handleAiSuggestions} disabled={isSuggesting || isUploading || !bannerImage || !logoImage} className="w-full h-9">
-            {isSuggesting ? <Loader2 className="animate-spin mr-2" /> : <Sparkles className="mr-2" />}
-            Sugerir Posición (IA)
-          </Button>
-          <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full h-9">
-            {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-            Guardar
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button disabled={isDownloading || !bannerImage} className="w-full h-9">
-                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
-                Descargar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-               <DropdownMenuContent align="center" className="w-56">
-                  {(Object.keys(DOWNLOAD_SIZES) as DownloadSize[]).map((sizeKey) => (
-                    <DropdownMenuSub key={sizeKey}>
-                      <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          {(['png', 'jpg', 'pdf'] as const).map((format) => (
-                            <DropdownMenuItem key={format} onClick={() => performDownload(format, sizeKey)}>
-                              {format.toUpperCase()}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenuPortal>
-          </DropdownMenu>
-        </div>
-      </Card>
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="text-effects-stroke">
+                        <AccordionTrigger className="text-sm py-1">Borde</AccordionTrigger>
+                        <AccordionContent className="space-y-1 pt-1">
+                          <div className="flex items-center justify-between h-8"><Label className="text-xs">Activar Borde</Label><Switch checked={textEffects.stroke.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, stroke: {...e.stroke, enabled: c}}))} /></div>
+                            {textEffects.stroke.enabled && <>
+                              <div className="space-y-1"><Label className="text-xs">Grosor ({textEffects.stroke.width}px)</Label><Slider value={[textEffects.stroke.width]} onValueChange={v => setTextEffects(e => ({ ...e, stroke: {...e.stroke, width: v[0]}}))} min={0.5} max={10} step={0.5} /></div>
+                              <div className="space-y-1"><Label className="text-xs">Color Borde</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="p-1 h-8 w-10" /><Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="h-8 text-xs"/></div></div>
+                            </>}
+                        </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </CardContent>
+          <div className="p-2 space-y-2 border-t">
+            <Button onClick={handleAiSuggestions} disabled={isSuggesting || isUploading || !bannerImage || !logoImage} className="w-full h-9">
+              {isSuggesting ? <Loader2 className="animate-spin mr-2" /> : <Sparkles className="mr-2" />}
+              Sugerir Posición (IA)
+            </Button>
+            <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full h-9">
+              {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+              Guardar
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={isDownloading || !bannerImage} className="w-full h-9">
+                  {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
+                  Descargar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuContent align="center" className="w-56">
+                    {(Object.keys(DOWNLOAD_SIZES) as DownloadSize[]).map((sizeKey) => (
+                      <DropdownMenuSub key={sizeKey}>
+                        <DropdownMenuSubTrigger>{DOWNLOAD_SIZES[sizeKey].name}</DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent>
+                            {(['png', 'jpg', 'pdf'] as const).map((format) => (
+                              <DropdownMenuItem key={format} onClick={() => performDownload(format, sizeKey)}>
+                                {format.toUpperCase()}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenuPortal>
+            </DropdownMenu>
+          </div>
+        </Card>
 
-      <div 
-        ref={bannerWrapperRef}
-        className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0 overflow-hidden"
-      >
-        <div
-          ref={bannerPreviewRef}
-          className="relative overflow-hidden shadow-lg bg-background"
-          style={{
-            width: `${bannerDimensions.width}px`,
-            height: `${bannerDimensions.height}px`,
-            transform: `scale(${scale})`,
-            transformOrigin: 'center center',
-          }}
+        <div 
+          ref={bannerWrapperRef}
+          className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0 overflow-hidden"
         >
-          {bannerImage ? (
-              <Image
-                  src={bannerImage}
-                  alt="Banner"
-                  layout="fill"
-                  objectFit="cover"
-                  unoptimized
-                  crossOrigin="anonymous"
-              />
-          ) : (
-              <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
-                  <h3 className="text-xl font-bold font-headline">{bannerDimensions.name}</h3>
-                  <p className="text-muted-foreground text-sm">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
-              </div>
-          )}
-          
-          {logoImage && (
-            <div
-              className={cn("absolute cursor-move group", { 'cursor-grabbing': isDraggingLogo })}
-              style={{
-                  top: `${logoPosition.y}%`,
-                  left: `${logoPosition.x}%`,
-                  width: `${logoSize}%`,
-                  transform: 'translate(-50%, -50%)',
-              }}
-              onMouseDown={(e) => handleDragMouseDown(e, 'logo')}
-            >
-              <div className="relative w-full" style={{paddingBottom: '100%'}}>
-                  <Image
-                      src={logoImage}
-                      alt="Logo"
-                      layout="fill"
-                      objectFit="contain"
-                      className="pointer-events-none"
-                      unoptimized
-                      crossOrigin="anonymous"
-                  />
-              </div>
-              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                <Move size={12} />
-              </div>
-            </div>
-          )}
-
-          {bannerImage && text && (
-            <div
-              id="banner-text-preview"
-              className={cn("absolute cursor-move group p-2", { 'cursor-grabbing': isDraggingText })}
-              style={{
-                top: `${textPosition.y}%`,
-                left: `${textPosition.x}%`,
-                transform: 'translate(-50%, -50%)',
-              }}
-              onMouseDown={(e) => handleDragMouseDown(e, 'text')}
-            >
-              <p
-                className={cn(headlineFont, 'font-bold whitespace-nowrap', {'text-stroke': textEffects.stroke.enabled})}
-                style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects.stroke.color, '--tw-stroke-width': `${textEffects.stroke.width}px` } as React.CSSProperties}
+          <div
+            ref={bannerPreviewRef}
+            className="relative overflow-hidden shadow-lg bg-background"
+            style={{
+              width: `${bannerDimensions.width}px`,
+              height: `${bannerDimensions.height}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'center center',
+            }}
+          >
+            {bannerImage ? (
+                <Image
+                    src={bannerImage}
+                    alt="Banner"
+                    layout="fill"
+                    objectFit="cover"
+                    unoptimized
+                    crossOrigin="anonymous"
+                />
+            ) : (
+                <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
+                    <h3 className="text-xl font-bold font-headline">{bannerDimensions.name}</h3>
+                    <p className="text-muted-foreground text-sm">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
+                </div>
+            )}
+            
+            {logoImage && (
+              <div
+                className={cn("absolute cursor-move group", { 'cursor-grabbing': isDraggingLogo })}
+                style={{
+                    top: `${logoPosition.y}%`,
+                    left: `${logoPosition.x}%`,
+                    width: `${logoSize}%`,
+                    transform: 'translate(-50%, -50%)',
+                }}
+                onMouseDown={(e) => handleDragMouseDown(e, 'logo')}
               >
-                {text}
-              </p>
-              <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                <Move size={10} />
+                <div className="relative w-full" style={{paddingBottom: '100%'}}>
+                    <Image
+                        src={logoImage}
+                        alt="Logo"
+                        layout="fill"
+                        objectFit="contain"
+                        className="pointer-events-none"
+                        unoptimized
+                        crossOrigin="anonymous"
+                    />
+                </div>
+                <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Move size={12} />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {bannerImage && text && (
+              <div
+                id="banner-text-preview"
+                className={cn("absolute cursor-move group p-2", { 'cursor-grabbing': isDraggingText })}
+                style={{
+                  top: `${textPosition.y}%`,
+                  left: `${textPosition.x}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                onMouseDown={(e) => handleDragMouseDown(e, 'text')}
+              >
+                <p
+                  className={cn(headlineFont, 'font-bold whitespace-nowrap', {'text-stroke': textEffects.stroke.enabled})}
+                  style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects.stroke.color, '--tw-stroke-width': `${textEffects.stroke.width}px` } as React.CSSProperties}
+                >
+                  {text}
+                </p>
+                <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Move size={10} />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      
+      <div className="flex-shrink-0 border-t bg-background">
+        <TemplateGallery onSelectTemplate={loadTemplate} />
+      </div>
     </div>
   );
 }
