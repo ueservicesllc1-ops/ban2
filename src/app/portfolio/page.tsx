@@ -22,9 +22,26 @@ export interface BannerData extends DocumentData {
   // Adding all properties to be available for editing/downloading
   logoPosition?: { x: number; y: number };
   logoSize?: number;
-  textStyle?: { font: string; size: number; color: string; };
   textPosition?: { x: number; y: number };
-  textEffects?: any;
+  textStyle?: {
+    font: string;
+    size: number;
+    color: string;
+  };
+  textEffects?: {
+    shadow: {
+      enabled: boolean;
+      color: string;
+      offsetX: number;
+      offsetY: number;
+      blur: number;
+    };
+    stroke: {
+      enabled: boolean;
+      color: string;
+      width: number;
+    };
+  };
   preset?: string;
   customDimensions?: { width: number; height: number; };
 }

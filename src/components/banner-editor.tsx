@@ -19,10 +19,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { useSearchParams, useRouter } from 'next/navigation';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import { BANNER_PRESETS } from '@/lib/constants';
+import { BANNER_PRESETS, FONT_OPTIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Switch } from '@/components/ui/switch';
 
 const DOWNLOAD_SIZES = {
   small: { name: 'Pequeño', scale: 0.5 },
@@ -45,12 +47,23 @@ export function BannerEditor() {
   const [logoPosition, setLogoPosition] = useState({ x: 15, y: 15 });
   const [logoSize, setLogoSize] = useState(15);
   const [textPosition, setTextPosition] = useState({ x: 50, y: 50 });
+  const [textStyle, setTextStyle] = useState({
+    font: 'Poppins',
+    size: 48,
+    color: '#FFFFFF',
+  });
+  const [textEffects, setTextEffects] = useState({
+    shadow: { enabled: true, color: '#000000', offsetX: 2, offsetY: 2, blur: 4 },
+    stroke: { enabled: false, color: '#000000', width: 1 },
+  });
+  
   const [downloadOptions, setDownloadOptions] = useState({ format: 'png', size: 'medium' });
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
   const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+  const [isDraggingText, setIsDraggingText] = useState(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
@@ -116,7 +129,7 @@ export function BannerEditor() {
 
     setIsSaving(true);
     try {
-      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, preset, customDimensions, userId: user.uid };
+      const data = { bannerImage, logoImage, logoPosition, logoSize, text, textPosition, textStyle, textEffects, preset, customDimensions, userId: user.uid };
       if (bannerId) {
         const docRef = doc(db, 'users', user.uid, 'banners', bannerId);
         await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
@@ -161,112 +174,204 @@ export function BannerEditor() {
     }
   };
   
-    const handleLogoMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!bannerPreviewRef.current) return;
-    setIsDraggingLogo(true);
-    const logoEl = e.currentTarget;
-    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
-    const logoRect = logoEl.getBoundingClientRect();
+  const handleDragMouseDown = (e: React.MouseEvent<HTMLDivElement>, type: 'logo' | 'text') => {
+      if (!bannerPreviewRef.current) return;
+      if (type === 'logo') setIsDraggingLogo(true);
+      if (type === 'text') setIsDraggingText(true);
+      
+      const targetEl = e.currentTarget;
+      const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
 
-    const offsetX = (e.clientX - logoRect.left) / scale;
-    const offsetY = (e.clientY - logoRect.top) / scale;
-    dragOffsetRef.current = { x: offsetX, y: offsetY };
-    
-    e.preventDefault();
+      const offsetX = (e.clientX - targetRect.left) / scale;
+      const offsetY = (e.clientY - targetRect.top) / scale;
+      dragOffsetRef.current = { x: offsetX, y: offsetY };
+      
+      e.preventDefault();
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingLogo || !bannerPreviewRef.current) return;
+    if (!isDraggingLogo && !isDraggingText) return;
+    if (!bannerPreviewRef.current) return;
 
     const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
-    let newX = (e.clientX - bannerRect.left) / scale - dragOffsetRef.current.x;
-    let newY = (e.clientY - bannerRect.top) / scale - dragOffsetRef.current.y;
+    
+    let newXPercent, newYPercent;
 
-    const logoWidth = (bannerDimensions.width * logoSize) / 100;
-    const logoHeight = (bannerDimensions.width * logoSize) / 100;
+    if (isDraggingLogo) {
+        let newX = (e.clientX - bannerRect.left) / scale - dragOffsetRef.current.x;
+        let newY = (e.clientY - bannerRect.top) / scale - dragOffsetRef.current.y;
+        
+        const logoWidth = (bannerDimensions.width * logoSize) / 100;
+        const logoHeight = (bannerDimensions.width * logoSize) / 100;
 
-    let newXPercent = ((newX + logoWidth / 2) / bannerDimensions.width) * 100;
-    let newYPercent = ((newY + logoHeight / 2) / bannerDimensions.height) * 100;
-
+        newXPercent = ((newX + logoWidth / 2) / bannerDimensions.width) * 100;
+        newYPercent = ((newY + logoHeight / 2) / bannerDimensions.height) * 100;
+    } else { // isDraggingText
+        const textEl = bannerPreviewRef.current.querySelector('#banner-text-preview') as HTMLElement;
+        if (!textEl) return;
+        
+        let newX = (e.clientX - bannerRect.left) / scale - dragOffsetRef.current.x;
+        let newY = (e.clientY - bannerRect.top) / scale - dragOffsetRef.current.y;
+        
+        newXPercent = ((newX + textEl.offsetWidth / 2) / bannerDimensions.width) * 100;
+        newYPercent = ((newY + textEl.offsetHeight / 2) / bannerDimensions.height) * 100;
+    }
+    
     newXPercent = Math.max(0, Math.min(100, newXPercent));
     newYPercent = Math.max(0, Math.min(100, newYPercent));
+    
+    if (isDraggingLogo) setLogoPosition({ x: newXPercent, y: newYPercent });
+    if (isDraggingText) setTextPosition({ x: newXPercent, y: newYPercent });
 
-    setLogoPosition({ x: newXPercent, y: newYPercent });
-  }, [isDraggingLogo, scale, logoSize, bannerDimensions]);
+  }, [isDraggingLogo, isDraggingText, scale, logoSize, bannerDimensions]);
 
   const handleMouseUp = useCallback(() => {
     setIsDraggingLogo(false);
+    setIsDraggingText(false);
   }, []);
 
   useEffect(() => {
-    if (isDraggingLogo) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    if (isDraggingLogo || isDraggingText) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp, { once: true });
     }
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingLogo, handleMouseMove, handleMouseUp]);
-
+  }, [isDraggingLogo, isDraggingText, handleMouseMove, handleMouseUp]);
+  
+  const textPreviewStyles = {
+    fontFamily: `'${textStyle.font}', sans-serif`,
+    fontSize: `${textStyle.size}px`,
+    color: textStyle.color,
+    textShadow: textEffects.shadow.enabled
+      ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
+      : 'none',
+  };
+  const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
-    <div className="flex h-[calc(100vh-65px)] w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
         <CardHeader>
           <CardTitle>Editor de Banner</CardTitle>
         </CardHeader>
         <div className="flex-1 min-h-0">
           <ScrollArea className="h-full">
-            <CardContent className="space-y-6">
-              <div>
-                <Label>Preset</Label>
-                <Select value={preset} onValueChange={(value) => setPreset(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un preset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(BANNER_PRESETS).map((key) => (
-                      <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
-                    ))}
-                    <SelectItem value="custom">Personalizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <CardContent className="space-y-4 pb-16">
+              <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
+                <AccordionItem value="item-1">
+                  <AccordionTrigger className="font-semibold">Configuración General</AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <div>
+                      <Label>Preset</Label>
+                      <Select value={preset} onValueChange={(value) => setPreset(value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un preset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(BANNER_PRESETS).map((key) => (
+                            <SelectItem key={key} value={key}>{BANNER_PRESETS[key as keyof typeof BANNER_PRESETS].name}</SelectItem>
+                          ))}
+                          <SelectItem value="custom">Personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div>
-                <Label>Imagen de banner</Label>
-                <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
-                {isUploading && <Loader2 className="animate-spin mt-2" />}
-              </div>
+                    <div>
+                      <Label>Imagen de banner</Label>
+                      <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading}/>
+                      {isUploading && <Loader2 className="animate-spin mt-2" />}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
-              <div>
-                <Label>Logo</Label>
-                <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
-              </div>
+                <AccordionItem value="item-2">
+                  <AccordionTrigger className="font-semibold">Logo</AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <div>
+                      <Label>Imagen del Logo</Label>
+                      <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
+                    </div>
 
-               {logoImage && (
-                <div className="space-y-2">
-                  <Label>Tamaño del Logo</Label>
-                  <Slider
-                    value={[logoSize]}
-                    onValueChange={(value) => setLogoSize(value[0])}
-                    max={50}
-                    min={5}
-                    step={1}
-                  />
-                </div>
-              )}
-
-              <div>
-                <Label>Texto</Label>
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} />
-              </div>
-
-              <div className="pt-4 space-y-4">
+                    {logoImage && (
+                      <div className="space-y-2">
+                        <Label>Tamaño del Logo ({logoSize}%)</Label>
+                        <Slider
+                          value={[logoSize]}
+                          onValueChange={(value) => setLogoSize(value[0])}
+                          max={50}
+                          min={5}
+                          step={1}
+                        />
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="item-3">
+                  <AccordionTrigger className="font-semibold">Texto</AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <div>
+                      <Label>Contenido del Texto</Label>
+                      <Textarea value={text} onChange={(e) => setText(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Tipografía</Label>
+                      <Select value={textStyle.font} onValueChange={(font) => setTextStyle(s => ({ ...s, font }))}>
+                          <SelectTrigger><SelectValue placeholder="Selecciona una fuente" /></SelectTrigger>
+                          <SelectContent>
+                              {FONT_OPTIONS.map(font => (
+                                  <SelectItem key={font.value} value={font.value} style={{fontFamily: `'${font.value}', sans-serif`}}>
+                                      {font.label}
+                                  </SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tamaño ({textStyle.size}px)</Label>
+                      <Slider value={[textStyle.size]} onValueChange={v => setTextStyle(s => ({ ...s, size: v[0] }))} max={200} min={10} step={1} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Color</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="color" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} className="p-1 h-10 w-16"/>
+                        <Input type="text" value={textStyle.color} onChange={e => setTextStyle(s => ({ ...s, color: e.target.value }))} />
+                      </div>
+                    </div>
+                    
+                    <Accordion type="multiple" className="w-full">
+                       <AccordionItem value="text-effects-shadow">
+                          <AccordionTrigger className="text-sm py-2">Sombra</AccordionTrigger>
+                          <AccordionContent className="space-y-4 pt-2">
+                            <div className="flex items-center justify-between"><Label>Activar Sombra</Label><Switch checked={textEffects.shadow.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, shadow: {...e.shadow, enabled: c}}))} /></div>
+                            {textEffects.shadow.enabled && <>
+                              <div className="space-y-2"><Label>Offset X ({textEffects.shadow.offsetX}px)</Label><Slider value={[textEffects.shadow.offsetX]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetX: v[0]}}))} min={-20} max={20} step={1} /></div>
+                              <div className="space-y-2"><Label>Offset Y ({textEffects.shadow.offsetY}px)</Label><Slider value={[textEffects.shadow.offsetY]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, offsetY: v[0]}}))} min={-20} max={20} step={1} /></div>
+                              <div className="space-y-2"><Label>Desenfoque ({textEffects.shadow.blur}px)</Label><Slider value={[textEffects.shadow.blur]} onValueChange={v => setTextEffects(e => ({ ...e, shadow: {...e.shadow, blur: v[0]}}))} min={0} max={40} step={1} /></div>
+                              <div className="space-y-2"><Label>Color Sombra</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.shadow.color} onChange={e => setTextEffects(eff => ({ ...eff, shadow: {...eff.shadow, color: e.target.value}}))} /></div></div>
+                            </>}
+                          </AccordionContent>
+                       </AccordionItem>
+                       <AccordionItem value="text-effects-stroke">
+                          <AccordionTrigger className="text-sm py-2">Borde</AccordionTrigger>
+                          <AccordionContent className="space-y-4 pt-2">
+                             <div className="flex items-center justify-between"><Label>Activar Borde</Label><Switch checked={textEffects.stroke.enabled} onCheckedChange={c => setTextEffects(e => ({ ...e, stroke: {...e.stroke, enabled: c}}))} /></div>
+                              {textEffects.stroke.enabled && <>
+                                <div className="space-y-2"><Label>Grosor ({textEffects.stroke.width}px)</Label><Slider value={[textEffects.stroke.width]} onValueChange={v => setTextEffects(e => ({ ...e, stroke: {...e.stroke, width: v[0]}}))} min={0.5} max={10} step={0.5} /></div>
+                                <div className="space-y-2"><Label>Color Borde</Label><div className="flex items-center gap-2"><Input type="color" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} className="p-1 h-10 w-16" /><Input type="text" value={textEffects.stroke.color} onChange={e => setTextEffects(eff => ({ ...eff, stroke: {...eff.stroke, color: e.target.value}}))} /></div></div>
+                              </>}
+                          </AccordionContent>
+                       </AccordionItem>
+                    </Accordion>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+              
+              <div className="pt-4 space-y-4 px-6">
                 <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
                   {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
                   Guardar
@@ -302,6 +407,7 @@ export function BannerEditor() {
                   alt="Banner"
                   layout="fill"
                   objectFit="cover"
+                  unoptimized
               />
           ) : (
               <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
@@ -312,14 +418,14 @@ export function BannerEditor() {
           
           {logoImage && (
             <div
-              className={cn("absolute cursor-move", { 'cursor-grabbing': isDraggingLogo })}
+              className={cn("absolute cursor-move group", { 'cursor-grabbing': isDraggingLogo })}
               style={{
                   top: `${logoPosition.y}%`,
                   left: `${logoPosition.x}%`,
                   width: `${logoSize}%`,
                   transform: 'translate(-50%, -50%)',
               }}
-              onMouseDown={handleLogoMouseDown}
+              onMouseDown={(e) => handleDragMouseDown(e, 'logo')}
             >
               <div className="relative w-full" style={{paddingBottom: '100%'}}>
                   <Image
@@ -328,38 +434,40 @@ export function BannerEditor() {
                       layout="fill"
                       objectFit="contain"
                       className="pointer-events-none"
+                      unoptimized
                   />
               </div>
               <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
                 <Move size={12} />
               </div>
             </div>
-
           )}
-          <div
-            className="absolute"
-            style={{
-              top: `${textPosition.y}%`,
-              left: `${textPosition.x}%`,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            <span
-              className={cn('whitespace-nowrap font-bold text-center', {
-                'text-transparent': !bannerImage
-              })}
+
+          {bannerImage && text && (
+            <div
+              id="banner-text-preview"
+              className={cn("absolute cursor-move group p-2", { 'cursor-grabbing': isDraggingText })}
               style={{
-                fontSize: `48px`
+                top: `${textPosition.y}%`,
+                left: `${textPosition.x}%`,
+                transform: 'translate(-50%, -50%)',
               }}
+              onMouseDown={(e) => handleDragMouseDown(e, 'text')}
             >
-              {text}
-            </span>
-          </div>
+              <p
+                className={cn(headlineFont, 'font-bold whitespace-nowrap', {'text-stroke': textEffects.stroke.enabled})}
+                style={{ ...textPreviewStyles, '--tw-stroke-color': textEffects.stroke.color, '--tw-stroke-width': `${textEffects.stroke.width}px` } as React.CSSProperties}
+              >
+                {text}
+              </p>
+              <div className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <Move size={10} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
     </div>
   );
 }
-
-    
