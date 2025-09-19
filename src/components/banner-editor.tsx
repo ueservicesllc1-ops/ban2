@@ -196,120 +196,96 @@ export function BannerEditor() {
   
 const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize = 'medium') => {
     if (!bannerPreviewRef.current) {
-        toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
-        return;
+      toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
+      return;
     }
     setIsDownloading(true);
 
     const bannerNode = bannerPreviewRef.current;
     const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
 
+    let clonedNode: HTMLElement | null = null;
     try {
-        const tempNode = bannerNode.cloneNode(true) as HTMLElement;
-        document.body.appendChild(tempNode);
+      const targetWidth = DOWNLOAD_SIZES[size].width;
 
-        // Preload and embed images
-        const images = Array.from(tempNode.getElementsByTagName('img'));
-        for (const img of images) {
-            if (img.src.startsWith('http')) {
-                 try {
-                    const response = await fetch(img.src, { mode: 'cors', cache: 'no-cache' });
-                    const blob = await response.blob();
-                    const dataUrl = await new Promise<string>(resolve => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(blob);
-                    });
-                    img.src = dataUrl;
-                } catch (e) {
-                    console.warn(`No se pudo cargar la imagen a base64: ${img.src}`, e);
-                }
-            }
-        }
-        
-        // Embed fonts
-        const styleSheets = Array.from(document.styleSheets);
-        let cssText = '';
-        const embedGoogleFont = async (cssRule: string): Promise<string> => {
-            const urlMatch = cssRule.match(/url\((https?:\/\/[^)]+)\)/);
-            if (!urlMatch) return cssRule;
-            const fontUrl = urlMatch[1];
-            try {
-                const res = await fetch(fontUrl);
-                const fontBuffer = await res.arrayBuffer();
-                const fontBase64 = btoa(new Uint8Array(fontBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-                return cssRule.replace(fontUrl, `data:font/woff2;base64,${fontBase64}`);
-            } catch (e) {
-                console.warn('No se pudo embeder la fuente', fontUrl, e);
-                return cssRule;
-            }
-        };
+      clonedNode = bannerNode.cloneNode(true) as HTMLElement;
+      clonedNode.style.position = 'absolute';
+      clonedNode.style.top = '-9999px';
+      clonedNode.style.left = '-9999px';
+      
+      const originalWidth = bannerNode.offsetWidth;
+      const originalHeight = bannerNode.offsetHeight;
+      const aspectRatio = originalWidth / originalHeight;
+      const targetHeight = targetWidth / aspectRatio;
 
-        for (const sheet of styleSheets) {
-            try {
-                if (sheet.cssRules) {
-                    for (const rule of Array.from(sheet.cssRules)) {
-                        if (rule.cssText.startsWith('@font-face')) {
-                            cssText += await embedGoogleFont(rule.cssText);
-                        } else {
-                            cssText += rule.cssText;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('No se pudo acceder a la hoja de estilos, omitiendo: ', e);
-            }
-        }
-        const styleEl = document.createElement('style');
-        styleEl.innerHTML = cssText;
-        tempNode.prepend(styleEl);
+      clonedNode.style.width = `${targetWidth}px`;
+      clonedNode.style.height = `${targetHeight}px`;
 
-        const targetWidth = DOWNLOAD_SIZES[size].width;
-        const scaleFactor = targetWidth / bannerDimensions.width;
-        const targetHeight = bannerDimensions.height * scaleFactor;
+      document.body.appendChild(clonedNode);
+      
+      // Embed images as data URIs
+      const images = Array.from(clonedNode.getElementsByTagName('img'));
+      for (const img of images) {
+          if (img.src && img.src.startsWith('http')) {
+              try {
+                  const response = await fetch(img.src);
+                  const blob = await response.blob();
+                  const dataUrl = await new Promise<string>((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result as string);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(blob);
+                  });
+                  img.src = dataUrl;
+              } catch (e) {
+                  console.warn(`Could not embed image: ${img.src}`, e);
+              }
+          }
+      }
 
-        const options = {
-            width: bannerDimensions.width,
-            height: bannerDimensions.height,
-            style: {
-                transform: `scale(${scaleFactor})`,
-                transformOrigin: 'top left',
-            },
-            pixelRatio: 2,
-        };
+      const options = {
+          width: targetWidth,
+          height: targetHeight,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          style: {
+            // We are sizing the node itself, so we don't need transform here
+          }
+      };
 
-        if (format === 'pdf') {
-            const jpegData = await htmlToImage.toJpeg(tempNode, { ...options, quality: 0.95 });
-            const doc = new jsPDF({
-                orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
-                unit: 'px',
-                format: [targetWidth, targetHeight],
-            });
-            doc.addImage(jpegData, 'JPEG', 0, 0, targetWidth, targetHeight);
-            doc.save(fileName);
-        } else {
-            const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-            const dataUrl = await generator(tempNode, options);
-            const link = document.createElement('a');
-            link.download = fileName;
-            link.href = dataUrl;
-            link.click();
-        }
-        
-        document.body.removeChild(tempNode);
-        toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
-
-    } catch (error) {
-        console.error('Error en la descarga:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error de Descarga',
-            description: 'Ocurrió un error al generar tu archivo. Revisa la consola para más detalles.',
+      if (format === 'pdf') {
+        const jpegData = await htmlToImage.toJpeg(clonedNode, { ...options, quality: 0.95 });
+        const doc = new jsPDF({
+          orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
+          unit: 'px',
+          format: [targetWidth, targetHeight],
         });
+        doc.addImage(jpegData, 'JPEG', 0, 0, targetWidth, targetHeight);
+        doc.save(fileName);
+      } else {
+        const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
+        const dataUrl = await generator(clonedNode, options);
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+      }
+
+      toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
+    } catch (error) {
+      console.error('Error en la descarga:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error de Descarga',
+        description: 'Ocurrió un error al generar tu archivo.',
+      });
     } finally {
-        setIsDownloading(false);
+      if (clonedNode) {
+        document.body.removeChild(clonedNode);
+      }
+      setIsDownloading(false);
     }
-  }, [bannerDimensions, text, toast]);
+  }, [text, toast]);
 
   const handleAiSuggestions = async () => {
     if (!bannerImage || !logoImage) {
