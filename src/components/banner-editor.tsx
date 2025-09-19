@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, Save, Download } from 'lucide-react';
+import { Loader2, Save, Download } from 'lucide-react';
 import { storage, db } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -62,10 +62,26 @@ export function BannerEditor() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
-
+  const bannerWrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  
   const bannerDimensions = useMemo(() => {
     return preset === 'custom' ? customDimensions : BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS];
   }, [preset, customDimensions]);
+
+  const updateScale = useCallback(() => {
+    if (bannerWrapperRef.current && bannerDimensions) {
+      const parentWidth = bannerWrapperRef.current.offsetWidth;
+      const scale = parentWidth / bannerDimensions.width;
+      setScale(Math.min(1, scale)); // No escalar más grande que 1
+    }
+  }, [bannerDimensions]);
+
+  useEffect(() => {
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [updateScale]);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
     const file = e.target.files?.[0];
@@ -115,7 +131,7 @@ export function BannerEditor() {
     setIsDownloading(true);
     try {
       const scale = DOWNLOAD_SIZES[downloadOptions.size as keyof typeof DOWNLOAD_SIZES].scale;
-      const dataUrl = await htmlToImage.toPng(element, { backgroundColor: null, pixelRatio: scale });
+      const dataUrl = await htmlToImage.toPng(element, { backgroundColor: '#ffffff', pixelRatio: scale, style: { transform: 'scale(1)', transformOrigin: 'center center' } });
       if (downloadOptions.format === 'pdf') {
         const pdf = new jsPDF({ unit: 'px', format: [bannerDimensions.width * scale, bannerDimensions.height * scale] });
         pdf.addImage(dataUrl, 'PNG', 0, 0, bannerDimensions.width * scale, bannerDimensions.height * scale);
@@ -137,8 +153,60 @@ export function BannerEditor() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-1 h-fit sticky top-24">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <div className="md:col-span-2 order-2 md:order-1">
+          <Card>
+            <CardContent className="p-4 md:p-6 flex justify-center items-center bg-muted/30">
+              <div 
+                ref={bannerWrapperRef}
+                className="w-full"
+              >
+                <div
+                  ref={bannerPreviewRef}
+                  className="relative overflow-hidden"
+                  style={{
+                    width: `${bannerDimensions.width}px`,
+                    height: `${bannerDimensions.height}px`,
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    backgroundImage: `url(${bannerImage})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                >
+                  {logoImage && (
+                    <Image
+                      src={logoImage}
+                      alt="Logo"
+                      width={logoSize * 10}
+                      height={logoSize * 10}
+                      style={{
+                        position: 'absolute',
+                        left: `${logoPosition.x}%`,
+                        top: `${logoPosition.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    />
+                  )}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: `${textPosition.x}%`,
+                      top: `${textPosition.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: `${1 / scale}em` // Compensate text size
+                    }}
+                  >
+                    {text}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <Card className="md:col-span-1 order-1 md:order-2 h-fit md:sticky md:top-24">
           <CardHeader>
             <CardTitle>Editor de Banner</CardTitle>
           </CardHeader>
@@ -185,47 +253,6 @@ export function BannerEditor() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardContent>
-            <div
-              ref={bannerPreviewRef}
-              className="relative"
-              style={{
-                width: `${bannerDimensions.width}px`,
-                height: `${bannerDimensions.height}px`,
-                border: '1px solid #ccc',
-                backgroundImage: `url(${bannerImage})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            >
-              {logoImage && (
-                <Image
-                  src={logoImage}
-                  alt="Logo"
-                  width={logoSize * 10}
-                  height={logoSize * 10}
-                  style={{
-                    position: 'absolute',
-                    left: `${logoPosition.x}%`,
-                    top: `${logoPosition.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                />
-              )}
-              <span
-                style={{
-                  position: 'absolute',
-                  left: `${textPosition.x}%`,
-                  top: `${textPosition.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-              >
-                {text}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
