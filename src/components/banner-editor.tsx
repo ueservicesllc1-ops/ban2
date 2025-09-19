@@ -193,6 +193,21 @@ export function BannerEditor() {
     }
   };
   
+  const getFontEmbedCSS = async () => {
+    const fontFamilies = FONT_OPTIONS.map(font => font.value.replace(/ /g, '+'));
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamilies.join('&family=')}&display=swap`;
+    
+    try {
+      const response = await fetch(fontUrl);
+      if (!response.ok) return '';
+      const cssText = await response.text();
+      return cssText;
+    } catch (error) {
+      console.error("Failed to fetch font CSS:", error);
+      return '';
+    }
+  };
+
 const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: DownloadSize) => {
     if (!bannerPreviewRef.current) {
         toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
@@ -201,11 +216,12 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
     setIsDownloading(true);
 
     try {
-        const banner = bannerPreviewRef.current;
-        const rect = banner.getBoundingClientRect();
+        const bannerNode = bannerPreviewRef.current;
+        const rect = bannerNode.getBoundingClientRect();
         const targetWidth = DOWNLOAD_SIZES[size].width;
         const scale = targetWidth / rect.width;
         const targetHeight = rect.height * scale;
+        const fontEmbedCSS = await getFontEmbedCSS();
 
         const options = {
             backgroundColor: '#ffffff',
@@ -218,12 +234,21 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
                 width: `${rect.width}px`,
                 height: `${rect.height}px`,
             },
+            fontEmbedCSS: fontEmbedCSS,
+             // Agregamos un filtro para excluir imágenes problemáticas si es necesario
+             filter: (node: HTMLElement) => {
+              // Ejemplo: si las imágenes de placeholder causan problemas
+              if (node.tagName === 'IMG' && node.src.includes('picsum.photos')) {
+                return false;
+              }
+              return true;
+            },
         };
 
         const fileName = `${text.substring(0, 20) || 'banner'}-${size}.${format}`;
         
         if (format === 'pdf') {
-            const imgData = await htmlToImage.toPng(banner, options);
+            const imgData = await htmlToImage.toPng(bannerNode, options);
             const pdf = new jsPDF({
                 orientation: targetWidth > targetHeight ? 'landscape' : 'portrait',
                 unit: 'px',
@@ -233,7 +258,7 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             pdf.save(fileName);
         } else {
             const generator = format === 'png' ? htmlToImage.toPng : htmlToImage.toJpeg;
-            const dataUrl = await generator(banner, { ...options, quality: 0.95 });
+            const dataUrl = await generator(bannerNode, { ...options, quality: 0.95 });
             const link = document.createElement('a');
             link.href = dataUrl;
             link.download = fileName;
