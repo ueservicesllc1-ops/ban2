@@ -1,3 +1,5 @@
+'use client';
+
 import { BannerEditor } from '@/components/banner-editor';
 import { Header } from '@/components/header';
 import { withAuth } from '@/components/with-auth';
