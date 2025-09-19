@@ -237,47 +237,45 @@ export function BannerEditor() {
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Preview</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 sm:p-6 h-full">
-              <div className="flex items-center justify-center w-full h-full">
-                <div
-                  className="relative w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner max-h-full"
-                  style={{
-                    aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
-                  }}
-                >
-                  {bannerImage ? (
-                    <Image src={bannerImage} alt="Banner background" fill style={{ objectFit: 'cover' }} />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                      <Upload className="h-10 w-10 mb-2" />
-                      <span>Upload a banner image to start</span>
-                    </div>
-                  )}
+            <CardContent className="p-2 sm:p-6 h-full flex items-center justify-center">
+              <div
+                className="relative w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner max-w-full lg:max-w-xl"
+                style={{
+                  aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
+                }}
+              >
+                {bannerImage ? (
+                  <Image src={bannerImage} alt="Banner background" fill style={{ objectFit: 'cover' }} />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                    <Upload className="h-10 w-10 mb-2" />
+                    <span>Upload a banner image to start</span>
+                  </div>
+                )}
 
-                  {logoImage && (
-                    <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
-                      <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
-                         <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} />
-                      </div>
+                {logoImage && (
+                  <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
+                    <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
+                       <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} />
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {bannerImage && text && (
-                    <div className={cn('absolute transition-all duration-500 ease-in-out p-2', placementClasses[textPlacement])}>
-                      <p
-                        className={cn(headlineFont, 'font-bold drop-shadow-lg')}
-                        style={{
-                          fontFamily: `'${textStyle.font}', sans-serif`,
-                          fontSize: `${textStyle.size}px`,
-                          color: textStyle.color,
-                          lineHeight: 1.2
-                        }}
-                      >
-                        {text}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                {bannerImage && text && (
+                  <div className={cn('absolute transition-all duration-500 ease-in-out p-2', placementClasses[textPlacement])}>
+                    <p
+                      className={cn(headlineFont, 'font-bold drop-shadow-lg')}
+                      style={{
+                        fontFamily: `'${textStyle.font}', sans-serif`,
+                        fontSize: `${textStyle.size}px`,
+                        color: textStyle.color,
+                        lineHeight: 1.2
+                      }}
+                    >
+                      {text}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
