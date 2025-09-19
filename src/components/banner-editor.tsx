@@ -21,6 +21,7 @@ import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import { BANNER_PRESETS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DOWNLOAD_SIZES = {
   small: { name: 'Pequeño', scale: 0.5 },
@@ -168,19 +169,18 @@ export function BannerEditor() {
   };
 
   return (
-    <div className="container mx-auto py-8 h-[calc(100vh-8rem)]">
-      <div className="flex flex-col lg:flex-row gap-8 h-full">
-        
-        {/* Editor Column */}
-        <Card className="w-full lg:w-96 order-1 lg:order-1 h-full flex flex-col">
-          <CardHeader>
-            <CardTitle>Editor de Banner</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6 flex-1 overflow-y-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-[384px_1fr] h-[calc(100vh-65px)] overflow-hidden">
+      {/* Editor Column */}
+      <Card className="rounded-none border-0 border-r flex flex-col">
+        <CardHeader>
+          <CardTitle>Editor de Banner</CardTitle>
+        </CardHeader>
+        <ScrollArea className="flex-1">
+          <CardContent className="space-y-6 pt-0">
             <div>
               <Label>Preset</Label>
-              <Select value={preset} onValueChange={(value) => {setPreset(value); updateScale()}}>
-                 <SelectTrigger>
+              <Select value={preset} onValueChange={(value) => setPreset(value)}>
+                <SelectTrigger>
                   <SelectValue placeholder="Selecciona un preset" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,81 +220,81 @@ export function BannerEditor() {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </ScrollArea>
+      </Card>
 
-        {/* Preview Column */}
-        <div 
-          ref={bannerWrapperRef}
-          className="flex-1 flex justify-center items-center bg-muted/30 rounded-lg p-4 relative min-h-0 order-2 lg:order-2"
+      {/* Preview Column */}
+      <div 
+        ref={bannerWrapperRef}
+        className="flex-1 flex justify-center items-center bg-muted/30 p-4 relative min-h-0"
+      >
+        <div
+          ref={bannerPreviewRef}
+          className="relative overflow-hidden shadow-lg bg-background"
+          style={{
+            width: `${bannerDimensions.width}px`,
+            height: `${bannerDimensions.height}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
+          }}
         >
-          <div
-            ref={bannerPreviewRef}
-            className="relative overflow-hidden shadow-lg bg-background"
-            style={{
-              width: `${bannerDimensions.width}px`,
-              height: `${bannerDimensions.height}px`,
-              transform: `scale(${scale})`,
-              transformOrigin: 'center center',
-            }}
-          >
-            {bannerImage ? (
-                <Image
-                    src={bannerImage}
-                    alt="Banner"
-                    layout="fill"
-                    objectFit="cover"
-                />
-            ) : (
-                <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
-                    <h3 className="text-2xl font-bold font-headline">{bannerDimensions.name}</h3>
-                    <p className="text-muted-foreground">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
-                </div>
-            )}
-            
-            {logoImage && (
-              <div
-                className="absolute"
-                style={{
-                    top: `${textPosition.y}%`,
-                    left: `${logoPosition.x}%`,
-                    width: `${logoSize}%`,
-                    transform: 'translate(-50%, -50%)',
-                }}
-              >
-                <div className="relative w-full" style={{paddingBottom: '100%'}}>
-                    <Image
-                        src={logoImage}
-                        alt="Logo"
-                        layout="fill"
-                        objectFit="contain"
-                    />
-                </div>
+          {bannerImage ? (
+              <Image
+                  src={bannerImage}
+                  alt="Banner"
+                  layout="fill"
+                  objectFit="cover"
+              />
+          ) : (
+              <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
+                  <h3 className="text-2xl font-bold font-headline">{bannerDimensions.name}</h3>
+                  <p className="text-muted-foreground">{bannerDimensions.width}px &times; {bannerDimensions.height}px</p>
               </div>
-
-            )}
+          )}
+          
+          {logoImage && (
             <div
               className="absolute"
               style={{
-                top: `${textPosition.y}%`,
-                left: `${textPosition.x}%`,
-                transform: 'translate(-50%, -50%)',
+                  top: `${textPosition.y}%`,
+                  left: `${logoPosition.x}%`,
+                  width: `${logoSize}%`,
+                  transform: 'translate(-50%, -50%)',
               }}
             >
-              <span
-                className={cn('whitespace-nowrap font-bold text-center', {
-                  'text-transparent': !bannerImage // Hide text if no image
-                })}
-                style={{
-                  fontSize: `48px` // Example static size, adjust as needed
-                }}
-              >
-                {text}
-              </span>
+              <div className="relative w-full" style={{paddingBottom: '100%'}}>
+                  <Image
+                      src={logoImage}
+                      alt="Logo"
+                      layout="fill"
+                      objectFit="contain"
+                  />
+              </div>
             </div>
+
+          )}
+          <div
+            className="absolute"
+            style={{
+              top: `${textPosition.y}%`,
+              left: `${textPosition.x}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <span
+              className={cn('whitespace-nowrap font-bold text-center', {
+                'text-transparent': !bannerImage // Hide text if no image
+              })}
+              style={{
+                fontSize: `48px` // Example static size, adjust as needed
+              }}
+            >
+              {text}
+            </span>
           </div>
         </div>
-        
       </div>
+      
     </div>
   );
 }
