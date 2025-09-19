@@ -448,7 +448,7 @@ export function BannerEditor() {
       textShadow: textEffects.shadow.enabled
         ? `${textEffects.shadow.offsetX}px ${textEffects.shadow.offsetY}px ${textEffects.shadow.blur}px ${textEffects.shadow.color}`
         : 'none',
-  };
+  }
 
   return (
     <div className="container mx-auto py-8">
