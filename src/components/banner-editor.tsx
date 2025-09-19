@@ -27,7 +27,12 @@ import { cn, fileToDataUri } from '@/lib/utils';
 import type { SuggestOptimalPlacementsOutput } from '@/ai/flows/suggest-optimal-placements';
 import { getPlacementSuggestions } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { Info, Loader2, Sparkles, Upload } from 'lucide-react';
+import { Info, Loader2, Sparkles, Upload, Save } from 'lucide-react';
+import { storage, db } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const placementClasses: { [key: string]: string } = {
   'top-left': 'top-4 left-4',
@@ -57,6 +62,8 @@ export function BannerEditor() {
 
   const [aiSuggestions, setAiSuggestions] = useState<SuggestOptimalPlacementsOutput | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [logoPlacement, setLogoPlacement] = useState('top-left');
   const [textPlacement, setTextPlacement] = useState('center');
 
@@ -70,15 +77,25 @@ export function BannerEditor() {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, setImage: (url: string | null) => void) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsUploading(true);
       try {
-        const dataUri = await fileToDataUri(file);
-        setImage(dataUri);
+        const fileRef = ref(storage, `images/${uuidv4()}-${file.name}`);
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+        setImage(downloadURL);
+        toast({
+          title: 'Upload successful',
+          description: 'Your image has been uploaded to Firebase Storage.',
+        });
       } catch (error) {
+        console.error('Error uploading file:', error);
         toast({
           variant: 'destructive',
-          title: 'Error reading file',
-          description: 'There was a problem converting your image. Please try another file.',
+          title: 'Upload failed',
+          description: 'There was a problem uploading your image. Please try again.',
         });
+      } finally {
+        setIsUploading(false);
       }
     }
   };
@@ -96,9 +113,23 @@ export function BannerEditor() {
     setIsLoadingAi(true);
     setAiSuggestions(null);
 
+    // AI flow needs data URIs, so we'll fetch them if they are Firebase URLs
+    const bannerDataUri = await urlToDataUri(bannerImage);
+    const logoDataUri = await urlToDataUri(logoImage);
+
+    if (!bannerDataUri || !logoDataUri) {
+       toast({
+        variant: 'destructive',
+        title: 'Image Conversion Failed',
+        description: 'Could not convert image URLs to data for AI processing.',
+      });
+      setIsLoadingAi(false);
+      return;
+    }
+
     const result = await getPlacementSuggestions({
-      bannerImageDataUri: bannerImage,
-      logoImageDataUri: logoImage,
+      bannerImageDataUri: bannerDataUri,
+      logoImageDataUri: logoDataUri,
       text: text,
     });
 
@@ -121,6 +152,53 @@ export function BannerEditor() {
     setIsLoadingAi(false);
   };
   
+  const urlToDataUri = async (url: string): Promise<string | null> => {
+    if (url.startsWith('data:')) return url;
+    if (url.startsWith('http')) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error("Error converting URL to data URI:", error);
+        return null;
+      }
+    }
+    return url;
+  };
+
+  const handleSaveBanner = async () => {
+    if (!bannerImage) {
+      toast({ variant: 'destructive', title: 'Cannot Save', description: 'Please upload a banner image before saving.'});
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'banners'), {
+        bannerImage,
+        logoImage,
+        text,
+        textStyle,
+        preset,
+        customDimensions,
+        logoPlacement,
+        textPlacement,
+        createdAt: new Date(),
+      });
+      toast({ title: 'Banner Saved!', description: 'Your banner configuration has been saved to Firestore.' });
+    } catch (error) {
+      console.error('Error saving banner: ', error);
+      toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save banner to Firestore.'});
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle.font)?.isHeadline ? 'font-headline' : 'font-body';
 
   return (
@@ -137,7 +215,7 @@ export function BannerEditor() {
                 <AccordionContent className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="banner-upload">Banner Image</Label>
-                    <Input id="banner-upload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} />
+                    <Input id="banner-upload" type="file" accept="image/*" onChange={(e) => handleFileChange(e, setBannerImage)} disabled={isUploading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="format-select">Preset Format</Label>
@@ -172,7 +250,7 @@ export function BannerEditor() {
                 <AccordionContent className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="logo-upload">Logo (PNG)</Label>
-                    <Input id="logo-upload" type="file" accept="image/png" onChange={(e) => handleFileChange(e, setLogoImage)} />
+                    <Input id="logo-upload" type="file" accept="image/png" onChange={(e) => handleFileChange(e, setLogoImage)} disabled={isUploading}/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="text-input">Overlay Text</Label>
@@ -213,7 +291,7 @@ export function BannerEditor() {
                 <AccordionTrigger className="font-headline">4. AI Smart Suggestions</AccordionTrigger>
                 <AccordionContent className="space-y-4 pt-4">
                   <p className="text-sm text-muted-foreground">Let our AI suggest the optimal placement for your logo and text for maximum impact.</p>
-                  <Button onClick={handleGetSuggestions} disabled={isLoadingAi} className="w-full bg-accent hover:bg-accent/90">
+                  <Button onClick={handleGetSuggestions} disabled={isLoadingAi || isUploading} className="w-full bg-accent hover:bg-accent/90">
                     {isLoadingAi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                     Suggest Placements
                   </Button>
@@ -228,25 +306,41 @@ export function BannerEditor() {
                   )}
                 </AccordionContent>
               </AccordionItem>
+              <AccordionItem value="item-5">
+                <AccordionTrigger className="font-headline">5. Save Banner</AccordionTrigger>
+                <AccordionContent className="space-y-4 pt-4">
+                  <p className="text-sm text-muted-foreground">Save your final banner design to the database.</p>
+                   <Button onClick={handleSaveBanner} disabled={isSaving || isUploading} className="w-full">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Save to Firestore
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </CardContent>
         </Card>
 
         <div className="lg:col-span-2">
-          <Card className="w-full h-full min-h-[400px] lg:min-h-0 flex flex-col">
-            <CardHeader>
+          <Card className="w-full h-full min-h-[400px] lg:min-h-0 flex flex-col items-center justify-center p-4">
+            <CardHeader className="w-full">
               <CardTitle className="font-headline text-2xl">Preview</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 sm:p-6 flex-1 flex items-center justify-center">
+            <CardContent className="p-2 sm:p-6 flex-1 flex items-center justify-center w-full">
               <div
                 className="relative w-full max-w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner"
                 style={{
                   aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
-                  maxHeight: 'calc(100vh - 250px)'
+                  maxHeight: 'calc(100vh - 300px)',
+                  maxWidth: `calc((100vh - 300px) * (${bannerDimensions.width} / ${bannerDimensions.height}))`
                 }}
               >
+                {isUploading && (
+                  <div className="absolute inset-0 z-10 bg-background/80 flex items-center justify-center">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  </div>
+                )}
                 {bannerImage ? (
-                  <Image src={bannerImage} alt="Banner background" fill style={{ objectFit: 'cover' }} />
+                  <Image src={bannerImage} alt="Banner background" fill style={{ objectFit: 'cover' }} unoptimized/>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                     <Upload className="h-10 w-10 mb-2" />
@@ -257,7 +351,7 @@ export function BannerEditor() {
                 {logoImage && (
                   <div className={cn('absolute transition-all duration-500 ease-in-out', placementClasses[logoPlacement])}>
                     <div className="relative w-24 h-24" style={{ width: '96px', height: 'auto', maxWidth: '150px' }}>
-                       <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} />
+                       <Image src={logoImage} alt="Logo" width={96} height={96} style={{objectFit: 'contain', width: '100%', height: 'auto'}} unoptimized/>
                     </div>
                   </div>
                 )}
