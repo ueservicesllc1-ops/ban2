@@ -233,15 +233,16 @@ export function BannerEditor() {
         </Card>
 
         <div className="lg:col-span-2">
-          <Card className="w-full h-full min-h-[400px] lg:min-h-0">
+          <Card className="w-full h-full min-h-[400px] lg:min-h-0 flex flex-col">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Preview</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 sm:p-6 h-full flex items-center justify-center">
+            <CardContent className="p-2 sm:p-6 flex-1 flex items-center justify-center">
               <div
-                className="relative w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner max-w-full lg:max-w-xl"
+                className="relative w-full max-w-full overflow-hidden bg-muted/50 rounded-lg shadow-inner"
                 style={{
                   aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
+                  maxHeight: 'calc(100vh - 250px)'
                 }}
               >
                 {bannerImage ? (
