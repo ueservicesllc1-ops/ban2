@@ -58,7 +58,7 @@ const placementToPercentage = (placement: string): { x: number; y: number } => {
         case 'bottom-left': return { x: 5, y: 95 };
         case 'bottom-center': return { x: 50, y: 95 };
         case 'bottom-right': return { x: 95, y: 95 };
-        default: return { x: 5, y: 5 };
+        default: return { x: 50, y: 50 };
     }
 };
 
@@ -82,18 +82,14 @@ export function BannerEditor() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // States for logo drag and resize
-  const [logoPosition, setLogoPosition] = useState({ x: 10, y: 10 }); // in percentage
-  const [logoSize, setLogoSize] = useState(15); // in percentage of banner width
-  const isDragging = useRef(false);
-  const dragStartPos = useRef({ x: 0, y: 0 });
+  const [logoPosition, setLogoPosition] = useState({ x: 10, y: 10 });
+  const [logoSize, setLogoSize] = useState(15);
+  const [textPosition, setTextPosition] = useState({ x: 50, y: 50 });
+
   const bannerPreviewRef = useRef<HTMLDivElement>(null);
+  const draggingElement = useRef<'logo' | 'text' | null>(null);
 
-
-  const [textPlacement, setTextPlacement] = useState('center');
-  
   useEffect(() => {
-    // This will run once when the component mounts
     if (user) {
       console.log('BannerEditor mounted. User is authenticated:', user.uid);
     } else {
@@ -114,8 +110,8 @@ export function BannerEditor() {
       setIsUploading(true);
       try {
         const fileRef = ref(storage, `images/${user.uid}/${uuidv4()}-${file.name}`);
-        await uploadBytes(fileRef, file);
-        const downloadURL = await getDownloadURL(fileRef);
+        const uploadTask = await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(uploadTask.ref);
         setImage(downloadURL);
         toast({
           title: 'Upload successful',
@@ -171,9 +167,9 @@ export function BannerEditor() {
       const suggestedLogoPlacement = result.data.logoPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
       const suggestedTextPlacement = result.data.textPlacement.toLowerCase().replace(/ /g, '-').replace(/_/g, '-');
       
-      const logoPos = placementToPercentage(suggestedLogoPlacement);
-      setLogoPosition(logoPos);
-      setTextPlacement(placementClasses[suggestedTextPlacement] ? suggestedTextPlacement : 'center');
+      setLogoPosition(placementToPercentage(suggestedLogoPlacement));
+      setTextPosition(placementToPercentage(suggestedTextPlacement));
+
       toast({
         title: 'Suggestions Received!',
         description: 'AI placements have been applied to your banner.',
@@ -192,31 +188,26 @@ export function BannerEditor() {
   const urlToDataUri = async (url: string): Promise<string | null> => {
     if (url.startsWith('data:')) return url;
     try {
-      // Using a proxy to avoid CORS issues when converting images from other origins
-      const response = await fetch(`https://cors-anywhere.herokuapp.com/${url}`);
+      // Using a proxy is not reliable, direct fetch is better.
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image from URL: ${url}. Status: ${response.status}`);
+      }
       const blob = await response.blob();
       return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
       });
-    } catch (error) {
-      console.error("Error converting URL to data URI:", error);
-      // Fallback for direct fetch if proxy fails or for same-origin requests
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        console.error("Direct fetch also failed:", e);
-        return null;
-      }
+    } catch (e) {
+      console.error("Error converting URL to data URI:", e);
+       toast({
+        variant: 'destructive',
+        title: 'Image Load Failed',
+        description: 'Could not load an image for AI processing. This can happen with temporary URLs or if the image is not publicly accessible.',
+      });
+      return null;
     }
   };
 
@@ -238,7 +229,7 @@ export function BannerEditor() {
         logoSize,
         text,
         textStyle,
-        textPlacement,
+        textPosition,
         preset,
         customDimensions,
         createdAt: new Date(),
@@ -253,24 +244,17 @@ export function BannerEditor() {
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!bannerPreviewRef.current) return;
-    isDragging.current = true;
-    
-    const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
-    dragStartPos.current = {
-      x: e.clientX,
-      y: e.clientY,
-      offsetX: e.clientX - bannerRect.left - (logoPosition.x / 100) * bannerRect.width,
-      offsetY: e.clientY - bannerRect.top - (logoPosition.y / 100) * bannerRect.height,
-    };
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, elementType: 'logo' | 'text') => {
     e.preventDefault();
+    draggingElement.current = elementType;
   };
 
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging.current || !bannerPreviewRef.current) return;
+    if (!draggingElement.current || !bannerPreviewRef.current) return;
 
     const bannerRect = bannerPreviewRef.current.getBoundingClientRect();
+    
+    // Calculate position in percentage relative to the banner
     let newX = ((e.clientX - bannerRect.left) / bannerRect.width) * 100;
     let newY = ((e.clientY - bannerRect.top) / bannerRect.height) * 100;
 
@@ -278,18 +262,24 @@ export function BannerEditor() {
     newX = Math.max(0, Math.min(100, newX));
     newY = Math.max(0, Math.min(100, newY));
 
-    setLogoPosition({ x: newX, y: newY });
+    if (draggingElement.current === 'logo') {
+      setLogoPosition({ x: newX, y: newY });
+    } else if (draggingElement.current === 'text') {
+      setTextPosition({ x: newX, y: newY });
+    }
   };
 
   const handleMouseUp = () => {
-    isDragging.current = false;
+    draggingElement.current = null;
   };
 
   useEffect(() => {
+    // Add event listeners for mouse move and up to the window
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      // Cleanup the event listeners
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -466,7 +456,7 @@ export function BannerEditor() {
                         width: `${logoSize}%`,
                         transform: 'translate(-50%, -50%)',
                       }}
-                      onMouseDown={handleMouseDown}
+                      onMouseDown={(e) => handleMouseDown(e, 'logo')}
                     >
                       <div className="relative w-full h-full" style={{ aspectRatio: '1 / 1'}}>
                         <Image src={logoImage} alt="Logo" layout="fill" objectFit="contain" unoptimized/>
@@ -475,9 +465,17 @@ export function BannerEditor() {
                   )}
 
                   {bannerImage && text && (
-                    <div className={cn('absolute transition-all duration-500 ease-in-out p-2 z-10', placementClasses[textPlacement])}>
+                     <div
+                      className="absolute cursor-move p-2 z-10"
+                      style={{
+                        left: `${textPosition.x}%`,
+                        top: `${textPosition.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      onMouseDown={(e) => handleMouseDown(e, 'text')}
+                    >
                       <p
-                        className={cn(headlineFont, 'font-bold drop-shadow-lg')}
+                        className={cn(headlineFont, 'font-bold drop-shadow-lg whitespace-nowrap')}
                         style={{
                           fontFamily: `'${textStyle.font}', sans-serif`,
                           fontSize: `${textStyle.size}px`,
