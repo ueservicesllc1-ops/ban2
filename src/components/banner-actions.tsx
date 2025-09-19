@@ -83,10 +83,8 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
             credentials: 'omit' as RequestCredentials,
           },
           fontEmbedCSS: fontCSS,
-          // The library fails to capture images from Firebase storage unless we provide this.
-          // It's a known issue with CORS and external images.
           filter: (node: HTMLElement) => {
-            return (node.tagName !== 'IMG' || (node as HTMLImageElement).crossOrigin !== 'anonymous');
+            return !(node.tagName === 'IMG' && (node as HTMLImageElement).crossOrigin === 'anonymous');
           }
       };
 

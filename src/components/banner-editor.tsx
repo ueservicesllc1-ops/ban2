@@ -147,31 +147,88 @@ export function BannerEditor() {
     }
   };
 
-  const handleDownload = async () => {
+    const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 'small' | 'medium' | 'large') => {
     const element = bannerPreviewRef.current;
-    if (!element) return;
+    if (!element) {
+      toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
+      return;
+    }
     setIsDownloading(true);
+
+    const { scale } = DOWNLOAD_SIZES[size];
+    const { width, height } = bannerDimensions;
+    const fileName = `${text.substring(0, 20) || 'banner'}.${format}`;
+
     try {
-      const scale = DOWNLOAD_SIZES[downloadOptions.size as keyof typeof DOWNLOAD_SIZES].scale;
-      const dataUrl = await htmlToImage.toPng(element, { backgroundColor: '#ffffff', pixelRatio: scale, style: { transform: 'scale(1)', transformOrigin: 'center center' } });
-      if (downloadOptions.format === 'pdf') {
-        const pdf = new jsPDF({ unit: 'px', format: [bannerDimensions.width * scale, bannerDimensions.height * scale] });
-        pdf.addImage(dataUrl, 'PNG', 0, 0, bannerDimensions.width * scale, bannerDimensions.height * scale);
-        pdf.save('banner.pdf');
-      } else {
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = `banner.${downloadOptions.format}`;
-        link.click();
-      }
-      toast({ title: 'Descarga completada', description: 'Tu banner ha sido descargado.' });
+        const fontFamilies = FONT_OPTIONS.map(f => f.value);
+        const fontCSS = await htmlToImage.getFontEmbedCSS(document.body, {
+            fontFamilies,
+            fetchRequestInit: {
+                mode: 'cors',
+                credentials: 'omit',
+            }
+        });
+
+        const options = {
+            width,
+            height,
+            canvasWidth: width * scale,
+            canvasHeight: height * scale,
+            style: {
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+            },
+            pixelRatio: 1,
+            fetchRequestInit: {
+              mode: 'cors' as RequestMode,
+              credentials: 'omit' as RequestCredentials,
+            },
+            fontEmbedCSS: fontCSS,
+            filter: (node: HTMLElement) => {
+              return !(node.tagName === 'IMG' && (node as HTMLImageElement).crossOrigin === 'anonymous');
+            }
+        };
+
+        let dataUrl;
+        
+        if (format === 'png') {
+          dataUrl = await htmlToImage.toPng(element, options);
+        } else if (format === 'jpg') {
+          dataUrl = await htmlToImage.toJpeg(element, { ...options, quality: 0.95 });
+        } else if (format === 'pdf') {
+          const pngDataUrl = await htmlToImage.toPng(element, options);
+          const doc = new jsPDF({
+            orientation: width > height ? 'landscape' : 'portrait',
+            unit: 'px',
+            format: [width, height],
+          });
+          doc.addImage(pngDataUrl, 'PNG', 0, 0, width, height);
+          doc.save(fileName);
+          setIsDownloading(false);
+          toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
+          return;
+        }
+
+        if (dataUrl) {
+          const link = document.createElement('a');
+          link.download = fileName;
+          link.href = dataUrl;
+          link.click();
+          toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
+        } else {
+          throw new Error('No se pudo generar la URL de datos.');
+        }
     } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo descargar el banner.' });
+      console.error('Error en la descarga:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error de Descarga',
+        description: 'Ocurrió un error al generar tu archivo. Las imágenes de otras webs pueden causar este problema.',
+      });
     } finally {
       setIsDownloading(false);
     }
-  };
+  }, [bannerDimensions, text, toast]);
   
   const handleDragMouseDown = (e: React.MouseEvent<HTMLDivElement>, type: 'logo' | 'text') => {
       if (!bannerPreviewRef.current) return;
@@ -253,7 +310,7 @@ export function BannerEditor() {
 
   return (
     <div className="flex h-full w-full overflow-hidden">
-      <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
+       <Card className="rounded-none border-0 border-r w-full lg:w-96 shrink-0 h-full flex flex-col">
         <CardHeader className="py-2 border-b">
           <CardTitle className="text-xl">Editor de Banner</CardTitle>
         </CardHeader>
@@ -364,7 +421,7 @@ export function BannerEditor() {
             {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
             Guardar
           </Button>
-          <Button onClick={handleDownload} disabled={isDownloading || !bannerImage} className="w-full h-9">
+          <Button onClick={() => performDownload('png', 'medium')} disabled={isDownloading || !bannerImage} className="w-full h-9">
             {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
             Descargar
           </Button>
@@ -392,6 +449,7 @@ export function BannerEditor() {
                   layout="fill"
                   objectFit="cover"
                   unoptimized
+                  crossOrigin="anonymous"
               />
           ) : (
               <div className="w-full h-full flex flex-col justify-center items-center border-2 border-dashed">
@@ -419,6 +477,7 @@ export function BannerEditor() {
                       objectFit="contain"
                       className="pointer-events-none"
                       unoptimized
+                      crossOrigin="anonymous"
                   />
               </div>
               <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
@@ -455,5 +514,3 @@ export function BannerEditor() {
     </div>
   );
 }
-
-    
