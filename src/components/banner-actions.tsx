@@ -60,7 +60,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
 
     try {
       const fontFamilies = FONT_OPTIONS.map(f => f.value);
-      const fontCSS = await htmlToImage.getWebFontCSS(document.body, {
+      const fontCSS = await htmlToImage.getFontEmbedCSS(document.body, {
           fontFamilies,
           fetchRequestInit: {
               mode: 'cors',
