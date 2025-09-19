@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
-  DropdownMenuSubContent
+  DropdownMenuSubContent,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import { Download, Edit, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -45,7 +46,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     router.push(`/?edit=${banner.id}`);
   };
 
-  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 'small' | 'medium' | 'large') => {
+  const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
     const element = previewRef.current;
     if (!element) {
       toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
@@ -53,10 +54,10 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     }
     setIsDownloading(true);
 
-    const { scale } = DOWNLOAD_SIZES[size];
+    const { scale } = DOWNLOAD_SIZES[sizeKey];
     const { width = 851, height = 315 } = banner.customDimensions || (banner.preset && BANNER_PRESETS[banner.preset as keyof typeof BANNER_PRESETS]) || {};
 
-    const fileName = `${banner.text?.substring(0, 20) || 'banner'}.${format}`;
+    const fileName = `${banner.text?.substring(0, 20) || 'banner'}-${sizeKey}.${format}`;
 
     try {
       const fontFamilies = FONT_OPTIONS.map(f => f.value);
@@ -99,9 +100,9 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
         const doc = new jsPDF({
           orientation: width > height ? 'landscape' : 'portrait',
           unit: 'px',
-          format: [width, height],
+          format: [width * scale, height * scale],
         });
-        doc.addImage(pngDataUrl, 'PNG', 0, 0, width, height);
+        doc.addImage(pngDataUrl, 'PNG', 0, 0, width * scale, height * scale);
         doc.save(fileName);
         setIsDownloading(false);
         toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.`});
@@ -130,7 +131,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
   }, [banner, toast]);
 
   const { textStyle, textEffects, preset, customDimensions } = banner;
-  const bannerDimensions = preset === 'custom' ? customDimensions : BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS] || { width: 851, height: 315 };
+  const bannerDimensions = preset === 'custom' ? customDimensions : (preset && BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS]) || { width: 851, height: 315 };
   
   const headlineFont = FONT_OPTIONS.find(f => f.value === textStyle?.font)?.isHeadline ? 'font-headline' : 'font-body';
   const textPreviewStyles = {
@@ -217,19 +218,24 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
                 {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 <span>Descargar</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => performDownload('png', 'medium')}>PNG</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => performDownload('jpg', 'medium')}>JPG</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => performDownload('pdf', 'medium')}>PDF</DropdownMenuItem>
-                <DropdownMenuSeparator/>
-                 <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Por tamaño</DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                         <DropdownMenuItem onClick={() => performDownload('png', 'small')}>PNG Pequeño</DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => performDownload('png', 'large')}>PNG Grande</DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                </DropdownMenuSub>
-            </DropdownMenuSubContent>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent>
+                 {(['png', 'jpg', 'pdf'] as const).map((format) => (
+                  <DropdownMenuSub key={format}>
+                    <DropdownMenuSubTrigger>{format.toUpperCase()}</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                          <DropdownMenuItem key={sizeKey} onClick={() => performDownload(format, sizeKey)}>
+                            {DOWNLOAD_SIZES[sizeKey].name} ({format.toUpperCase()})
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
           </DropdownMenuSub>
           
           <DropdownMenuSeparator />
@@ -242,3 +248,5 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     </>
   );
 }
+
+    

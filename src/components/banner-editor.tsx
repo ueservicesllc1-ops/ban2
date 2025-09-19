@@ -24,6 +24,17 @@ import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Switch } from '@/components/ui/switch';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal
+} from "@/components/ui/dropdown-menu";
 
 const DOWNLOAD_SIZES = {
   small: { name: 'Pequeño', scale: 0.5 },
@@ -56,7 +67,6 @@ export function BannerEditor() {
     stroke: { enabled: false, color: '#000000', width: 1 },
   });
   
-  const [downloadOptions, setDownloadOptions] = useState({ format: 'png', size: 'medium' });
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -147,7 +157,7 @@ export function BannerEditor() {
     }
   };
 
-    const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 'small' | 'medium' | 'large') => {
+    const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', sizeKey: keyof typeof DOWNLOAD_SIZES) => {
     const element = bannerPreviewRef.current;
     if (!element) {
       toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
@@ -155,9 +165,9 @@ export function BannerEditor() {
     }
     setIsDownloading(true);
 
-    const { scale } = DOWNLOAD_SIZES[size];
+    const { scale } = DOWNLOAD_SIZES[sizeKey];
     const { width, height } = bannerDimensions;
-    const fileName = `${text.substring(0, 20) || 'banner'}.${format}`;
+    const fileName = `${text.substring(0, 20) || 'banner'}-${sizeKey}.${format}`;
 
     try {
         const fontFamilies = FONT_OPTIONS.map(f => f.value);
@@ -200,9 +210,9 @@ export function BannerEditor() {
           const doc = new jsPDF({
             orientation: width > height ? 'landscape' : 'portrait',
             unit: 'px',
-            format: [width, height],
+            format: [width * scale, height * scale],
           });
-          doc.addImage(pngDataUrl, 'PNG', 0, 0, width, height);
+          doc.addImage(pngDataUrl, 'PNG', 0, 0, width * scale, height * scale);
           doc.save(fileName);
           setIsDownloading(false);
           toast({ title: 'Descarga Iniciada', description: `Tu ${format.toUpperCase()} se está descargando.` });
@@ -421,10 +431,32 @@ export function BannerEditor() {
             {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
             Guardar
           </Button>
-          <Button onClick={() => performDownload('png', 'medium')} disabled={isDownloading || !bannerImage} className="w-full h-9">
-            {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
-            Descargar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={isDownloading || !bannerImage} className="w-full h-9">
+                {isDownloading ? <Loader2 className="animate-spin mr-2" /> : <Download className="mr-2" />}
+                Descargar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuContent align="center" className="w-56">
+                {(['png', 'jpg', 'pdf'] as const).map((format) => (
+                  <DropdownMenuSub key={format}>
+                    <DropdownMenuSubTrigger>{format.toUpperCase()}</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        {(Object.keys(DOWNLOAD_SIZES) as Array<keyof typeof DOWNLOAD_SIZES>).map((sizeKey) => (
+                          <DropdownMenuItem key={sizeKey} onClick={() => performDownload(format, sizeKey)}>
+                            {DOWNLOAD_SIZES[sizeKey].name} ({format.toUpperCase()})
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
+          </DropdownMenu>
         </div>
       </Card>
 
@@ -514,3 +546,5 @@ export function BannerEditor() {
     </div>
   );
 }
+
+    
