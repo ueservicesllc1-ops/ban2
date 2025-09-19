@@ -35,8 +35,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getPlacementSuggestions } from '@/app/actions';
 import { fileToDataUri } from '@/lib/utils';
-import { TemplateGallery } from './template-gallery';
-import type { Template } from '@/lib/templates';
 
 type DownloadSize = 'small' | 'medium' | 'large';
 const DOWNLOAD_SIZES: Record<DownloadSize, { name: string, width: number }> = {
@@ -88,25 +86,6 @@ export function BannerEditor() {
     return BANNER_PRESETS[preset as keyof typeof BANNER_PRESETS] || BANNER_PRESETS.facebookCover;
   }, [preset, customDimensions]);
 
-  const loadTemplate = (template: Template) => {
-    setBannerImage(template.bannerImage);
-    setLogoImage(template.logoImage);
-    setText(template.text);
-    setPreset(template.preset);
-    if(template.preset === 'custom' && template.customDimensions) {
-      setCustomDimensions(template.customDimensions);
-    }
-    setLogoPosition(template.logoPosition);
-    setLogoSize(template.logoSize);
-    setTextPosition(template.textPosition);
-    setTextStyle(template.textStyle);
-    setTextEffects(template.textEffects);
-
-    toast({
-      title: 'Plantilla Cargada',
-      description: `Se ha cargado la plantilla "${template.name}".`,
-    })
-  };
 
    useEffect(() => {
     const editId = searchParams.get('edit');
@@ -681,9 +660,6 @@ const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 
             )}
           </div>
         </div>
-      </div>
-      <div className="flex-shrink-0 border-t bg-background">
-        <TemplateGallery onSelectTemplate={loadTemplate} />
       </div>
     </div>
   );
