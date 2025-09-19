@@ -17,6 +17,7 @@ import { Download, Edit, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import * as htmlToImage from 'html-to-image';
+import { getWebFontCSS } from 'html-to-image/es/embed-webfonts';
 import jsPDF from 'jspdf';
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,8 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
   };
 
   const performDownload = useCallback(async (format: 'png' | 'jpg' | 'pdf', size: 'small' | 'medium' | 'large') => {
-    if (!previewRef.current) {
+    const element = previewRef.current;
+    if (!element) {
       toast({ variant: 'destructive', title: 'Error de Descarga', description: 'No se pudo encontrar el elemento de vista previa.' });
       return;
     }
@@ -58,24 +60,31 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
     const fileName = `${banner.text?.substring(0, 20) || 'banner'}.${format}`;
 
     try {
-      const options = {
-        canvasWidth: width * scale,
-        canvasHeight: height * scale,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          width: `${width}px`,
-          height: `${height}px`,
-        },
-        pixelRatio: 1,
-        fetchRequestInit: {
-          mode: 'cors' as RequestMode,
-          credentials: 'omit' as RequestCredentials,
-        },
-      };
+        const fontCSS = await getWebFontCSS(element, {
+            fetchRequestInit: {
+                mode: 'cors',
+                credentials: 'omit',
+            },
+        });
+
+        const options = {
+            canvasWidth: width * scale,
+            canvasHeight: height * scale,
+            style: {
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              width: `${width}px`,
+              height: `${height}px`,
+            },
+            pixelRatio: 1,
+            fetchRequestInit: {
+              mode: 'cors' as RequestMode,
+              credentials: 'omit' as RequestCredentials,
+            },
+            fontEmbedCSS: fontCSS,
+        };
 
       let dataUrl;
-      const element = previewRef.current;
       
       if (format === 'png') {
         dataUrl = await htmlToImage.toPng(element, options);
@@ -135,6 +144,7 @@ export function BannerActions({ banner, children, onDelete }: BannerActionsProps
       <div className="fixed -left-[9999px] top-0">
           <div
               ref={previewRef}
+              id={`preview-node-${banner.id}`}
               className="relative overflow-hidden bg-muted/50"
               style={{
                 width: `${bannerDimensions?.width}px`,

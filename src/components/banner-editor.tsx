@@ -36,6 +36,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/hooks/use-auth';
 import { Switch } from '@/components/ui/switch';
 import * as htmlToImage from 'html-to-image';
+import { getWebFontCSS } from 'html-to-image/es/embed-webfonts';
 import jsPDF from 'jspdf';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { BannerData } from '@/app/portfolio/page';
@@ -244,7 +245,11 @@ export function BannerEditor() {
   const urlToDataUri = async (url: string): Promise<string | null> => {
     if (url.startsWith('data:')) return url;
     try {
-      const response = await fetch(url);
+      // Use a proxy to fetch the image and avoid CORS issues.
+      // NOTE: This uses a public CORS proxy. In a production environment, you should host your own.
+      const proxyUrl = 'https://images.weserv.nl/?url=';
+      const response = await fetch(`${proxyUrl}${encodeURIComponent(url.replace('https://', ''))}`);
+
       if (!response.ok) {
         throw new Error(`Failed to fetch image from URL: ${url}. Status: ${response.status}`);
       }
@@ -333,26 +338,34 @@ export function BannerEditor() {
     const { scale } = DOWNLOAD_SIZES[downloadOptions.size as keyof typeof DOWNLOAD_SIZES];
     const { width, height } = bannerDimensions;
     const format = downloadOptions.format;
+    const element = bannerPreviewRef.current;
 
     try {
-      const options = {
-        canvasWidth: width * scale,
-        canvasHeight: height * scale,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          width: `${width}px`,
-          height: `${height}px`,
-        },
-        pixelRatio: 1, 
-        fetchRequestInit: {
-          mode: 'cors' as RequestMode,
-          credentials: 'omit' as RequestCredentials,
-        },
-      };
+        const fontCSS = await getWebFontCSS(element, {
+            fetchRequestInit: {
+                mode: 'cors',
+                credentials: 'omit',
+            },
+        });
+        const options = {
+            canvasWidth: width * scale,
+            canvasHeight: height * scale,
+            style: {
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              width: `${width}px`,
+              height: `${height}px`,
+            },
+            pixelRatio: 1,
+            fetchRequestInit: {
+              mode: 'cors' as RequestMode,
+              credentials: 'omit' as RequestCredentials,
+            },
+            fontEmbedCSS: fontCSS,
+        };
 
       let dataUrl;
-      const element = bannerPreviewRef.current;
+      
       const fileName = `${text.substring(0,20) || 'banner'}.${format}`;
 
       if (format === 'png') {
@@ -675,6 +688,7 @@ export function BannerEditor() {
                <div className="relative w-full h-full flex items-center justify-center">
                 <div
                   ref={bannerPreviewRef}
+                  id="banner-preview-node"
                   className="relative overflow-hidden bg-muted/50 rounded-lg shadow-inner"
                   style={{
                     aspectRatio: `${bannerDimensions.width} / ${bannerDimensions.height}`,
